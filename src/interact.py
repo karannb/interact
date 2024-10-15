@@ -51,6 +51,7 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
 
     return D, M
 
+
 if __name__ == "__main__":
     data = [1, 2, 3]
     Interact(data, 1, 2, 3)

@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Tuple
 from src.utils import assemble_context, assemble_prompt
 
 
