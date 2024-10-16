@@ -1,20 +1,37 @@
-from typing import Tuple, List
+from typing import Tuple, List, Union, Dict
+Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
-def assemble_context(mu_h: Tuple, mu_m: Tuple) -> List:
+import os
+from openai import OpenAI
+openai_org = os.getenv("OPENAI_ORG")
+openai_project = os.getenv("OPENAI_PROJECT")
+openai_key = os.getenv("OPENAI_KEY")
+client = OpenAI(organization=openai_org, 
+                project=openai_project, 
+                api_key=openai_key)
+
+
+def assemble_context(mu_h: Tuple, mu_m: Tuple, C: List) -> List:
     """
     Assemble context for the machine.
 
     Args:
         mu_h (Tuple): human's response
         mu_m (Tuple): machine's response
+        C (List): context uptil now
 
     Returns:
         Tuple: context
     """
-    pass
+    _, y_h, e_h = mu_h
+    _, y_m, e_m = mu_m
+    matchOK = match(y_h, y_m)
+    agreeOK = agree(e_h, e_m)
+    C.append((y_h, y_m, e_h, e_m, matchOK, agreeOK))
+    return C
 
 
-def assemble_prompt(x, c_j) -> str:
+def assemble_prompt(x, c_j) -> Prompt:
     """
     Assemble prompt for the LLM.
 
@@ -23,9 +40,10 @@ def assemble_prompt(x, c_j) -> str:
         c_j: context
 
     Returns:
-        str: prompt
+        Prompt: prompt
     """
-    pass
+    if c_j is None:
+        message = ""
 
 
 def match(y, pred) -> bool:

@@ -19,7 +19,7 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
     """
 
     # Initialize the relational databases
-    D, M = [], []
+    D, M, C = [], [], []
     n *= 2 # number of interactions need to be doubled
 
     # Initialize the agents
@@ -37,12 +37,12 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
         done = False
         while not done:
             # ask the machine
-            mu_m = machine.ask(j, k, (D, M)) # (tag, pred, expl)
+            mu_m = machine.ask(j, k, (D, M, C)) # (tag, pred, expl)
             M += [(sess, j, m, mu_m, h)]
             j += 1
 
             # ask the human
-            mu_h = human.ask(j, k, (D, M))
+            mu_h = human.ask(j, k, (D, M, C))
             M += [(sess, j, h, mu_h, m)]
             j += 1
 
