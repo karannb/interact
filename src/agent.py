@@ -1,15 +1,22 @@
 from typing import Tuple
 from functools import partial
-from src.utils import assemble_context, assemble_prompt
+from src.utils import (
+    agree, 
+    match, 
+    encode_image, 
+    parse_response, 
+    assemble_prompt)
 
 import os
 from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_project = os.getenv("OPENAI_PROJECT")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(organization=openai_org, 
-                project=openai_project, 
-                api_key=openai_key)
+# openai_org = os.getenv("OPENAI_ORG")
+# openai_project = os.getenv("OPENAI_PROJECT")
+# openai_key = os.getenv("OPENAI_KEY")
+client = OpenAI(
+    organization="org-FS3BNL7yaD4kX7b68zAMckVr",
+    project="proj_eHzIByecPCksPXepXpcAB9cT",
+    api_key="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"
+)
 
 
 class Agent:
@@ -63,24 +70,19 @@ class Machine(Agent):
         # current session & example
         sess, x = D[-1]
 
-        # assemble context for the machine if j > 2
-        if j > 2:
-            mu_h = M[-1][3]
-            mu_m = M[-2][3]
-            c_j = assemble_context(mu_h, mu_m, C)
-        else:
-            c_j = None
-
         # assemble prompt and ask LLM
-        P_j = assemble_prompt(x, c_j)
-        y, e = self.llm(messages=P_j)
+        P_j = assemble_prompt(x, C)
+        response = self.llm(messages=P_j)
+        y, e, C = parse_response(response, C)
 
-        # get label
+        # get label for the machine
         l_m = None
         # if j <= 2, we don't have human's response yet
         if (j > 2):
-            _, y_h, e_h = mu_h
-            if y != y_h and e != e_h:
+            _, y_h, e_h = M[-1]
+            matchOK = match(y, y_h)
+            agreeOK = agree(e, e_h)
+            if not matchOK and not agreeOK:
                 if j > k:
                     l_m = "reject"
                 else:
@@ -90,7 +92,7 @@ class Machine(Agent):
         else:
             l_m = "revise"
 
-        return l_m, y, e
+        return (l_m, y, e), C
 
 
 class Human(Agent):
@@ -112,24 +114,61 @@ class Human(Agent):
         Returns:
             Tuple: response (tag, pred, expl)
         """
-        D, M, _ = delta
+        D, M, C = delta
 
         # current session & example
         sess, x = D[-1]
-        e, y = x
+        img, y, e = x
+        encoded_img = encode_image(img)
 
         # get prev machine response
         mu_m = M[-1][3]
         _, y_m, e_m = mu_m
 
         # get label
-        l_h = None
-        if y_m == y and e_m == e:
+        l_h, human_response = None, None
+        matchOK = match(y, y_m)
+        agreeOK = agree(e, e_m)
+        if matchOK and agreeOK:
             l_h = "ratify"
-        elif y_m != y and e_m != e:
+            human_response = {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Both the diagnosis and the explanation are correct. Great job!"
+                    },
+                    {
+                        "type": "img_url",
+                        "img_url": {
+                            "url": f"data:image/jpeg;base64,{encoded_img}"
+                        }
+                    }
+                ]
+            }
+        elif not matchOK and agreeOK:
+            l_h = "refute"
+            human_response = {
+                "role": "user",
+                "content": f"The diagnosis about {y_m} is incorrect, but the explanation is correct. Please correct the diagnosis."
+            }
+        elif matchOK and not agreeOK:
+            l_h = "refute"
+            human_response = {
+                "role": "user",
+                "content": f"The diagnosis about {y_m} is correct, but the explanation is incorrect. Please correct the explanation. The correct explanation is {e}."
+            }
+        else:
             if j > k:
                 l_h = "reject"
             else:
                 l_h = "refute"
+                human_response = {
+                    "role": "user",
+                    "content": f"Both the diagnosis and the explanation are incorrect. Please correct both. The correct explanation is {e}."
+                }
 
-        return l_h, y, e
+        # append the human response to the conversation
+        C.append(human_response)
+
+        return (l_h, y, e), C

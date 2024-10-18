@@ -19,7 +19,7 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
     """
 
     # Initialize the relational databases
-    D, M, C = [], [], []
+    D, M, C = [], [], None
     n *= 2 # number of interactions need to be doubled
 
     # Initialize the agents
@@ -37,19 +37,26 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
         done = False
         while not done:
             # ask the machine
-            mu_m = machine.ask(j, k, (D, M, C)) # (tag, pred, expl)
+            mu_m, C = machine.ask(j, k, (D, M, C)) # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
 
             # ask the human
-            mu_h = human.ask(j, k, (D, M, C))
+            mu_h, C = human.ask(j, k, (D, M, C))
             M += [(sess, j, h, mu_h, m)]
             j += 1
 
             # stopping condition
             done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
 
-    return D, M
+        # only check for ratify because, in this special case,
+        # human agent can never revise.
+        if mu_h[0] == "ratify":
+            print("Strongly intelligible for the Human.")
+        elif mu_h[0] == "reject" or mu_h[0] == "refute":
+            print("Not Strongly intelligible for the Human.")
+
+    return D, M, C
 
 
 if __name__ == "__main__":
