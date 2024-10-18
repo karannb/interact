@@ -1,7 +1,8 @@
-from typing import Tuple, List, Union, Dict
+from typing import Tuple, List, Union, Dict, Optional
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 import os
+from copy import deepcopy
 from openai import OpenAI
 # openai_org = os.getenv("OPENAI_ORG")
 # openai_project = os.getenv("OPENAI_PROJECT")
@@ -12,7 +13,6 @@ client = OpenAI(
     api_key="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"
 )
 
-import re
 import base64
 
 
@@ -35,7 +35,7 @@ def assemble_prompt(x, c_j) -> Prompt:
     Returns:
         Prompt: prompt
     """
-    img, y, _ = x
+    y, img, _ = x
     encoded_img = encode_image(img)
     messages = [
         {
@@ -44,14 +44,13 @@ def assemble_prompt(x, c_j) -> Prompt:
         },
         {
             "role": "user",
-            "content": f"Given the following chest XRay, you have to predict the existence of {y}."
+            "content": f"""
+            Given the following chest XRay, you have to predict the existence of {y}.
+            Adhere to the following output format strictly, no extra text:
+            *Prediction: Yes/No*
+            *Explanation: <Your explanation here>*
+            """
         },
-        {
-            "role": "user",
-            "content": """Adhere to the following output format strictly, no extra text:
-                        Prediction: Yes/No
-                        Explanation: <Your explanation here>
-            """},
         {
             "role": "user",
             "content": [
@@ -67,7 +66,9 @@ def assemble_prompt(x, c_j) -> Prompt:
     if c_j is None:
         return messages
     else:
-        pass
+        copied_c_j = deepcopy(c_j)
+        copied_c_j.extend(messages)
+        return copied_c_j
 
 
 def match(y, pred) -> bool:
@@ -75,14 +76,15 @@ def match(y, pred) -> bool:
     Match the prediction with the example.
 
     Args:
-        y: prediction
+        y: ground truth (unused right now, but might be useful in the future)
         pred: prediction
 
     Returns:
         bool: True if the prediction matches the example, False otherwise
     """
+    pred = str(pred).lower()
     y = str(y).lower()
-    if y == "yes":
+    if "yes" in pred or y == pred:
         return True
     else:
         return False
@@ -122,7 +124,7 @@ def agree(e, e_pred) -> bool:
         return False
 
 
-def parse_response(response, C: List) -> Tuple:
+def parse_response(response, C: Optional[List]) -> Tuple:
     """
     Parse the response from the LLM.
 
@@ -134,7 +136,15 @@ def parse_response(response, C: List) -> Tuple:
         Tuple: prediction and explanation
     """
     response = response.choices[0].message.content
-    prediction, explanation = response.split("\n")
+    pred_and_expl = response.split("\n")
+    prediction, explanation = "", ""
+    for text in pred_and_expl:
+        if "Prediction" in text:
+            prediction = text
+        if "Explanation" in text:
+            explanation = text
+    assert prediction != "", "Prediction not found in the response"
+    assert explanation != "", "Explanation not found in the response" 
     assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: Yes/No', got " + prediction
     assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
 
@@ -143,9 +153,13 @@ def parse_response(response, C: List) -> Tuple:
         "role": "system",
         "content": response
     }
-    C.append(response_conv)
+    if C != None:
+        C.append(response_conv)
+    else:
+        C = [response_conv]
 
     return prediction.split(":")[1].strip(), explanation.split(":")[1].strip(), C
+
 
 def summarize(report: str, ailment: str) -> str:
     """

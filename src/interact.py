@@ -1,14 +1,17 @@
+import sys
+sys.path.append("./")
+
 import uuid
 from typing import List
 from src.agent import Machine, Human
 
 
-def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
+def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
     """
     Core interact function between the human and the machine.
 
     Args:
-        data (List): Input Data instances, a list of data.
+        data : Input Data instances, a list of data.
         h (int): human-identifier
         m (int): machine-identifier
         n (int): upper bound on interactions
@@ -27,8 +30,7 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
     machine = Machine(m)
 
     # Iterate over all input data
-    for x in data:
-
+    for idx, x in data:
         # Generate a random session identifier and store the input data
         sess = uuid.uuid4().hex[:4]
         D.append((x, sess))
@@ -60,5 +62,8 @@ def Interact(data: List, h: int, m: int, n: int, k: int = 3) -> List:
 
 
 if __name__ == "__main__":
-    data = [1, 2, 3]
-    Interact(data, 1, 2, 3)
+    import pandas as pd
+    data = pd.read_csv("data/xray_data_filtered.csv", index_col=None)
+    data = data.drop(columns=["case", "label_short"], inplace=False)
+    iterdata = data.iterrows()
+    Interact(iterdata, h=1, m=2, n=3)

@@ -40,7 +40,7 @@ class Agent:
         Returns:
             Tuple: response (tag, pred, expl)
         """
-        raise NotImplementedError, "Subclass must implement abstract method."
+        raise NotImplementedError("Subclass must implement abstract method.")
 
 
 class Machine(Agent):
@@ -68,7 +68,7 @@ class Machine(Agent):
         D, M, C = delta
 
         # current session & example
-        sess, x = D[-1]
+        x, sess = D[-1]
 
         # assemble prompt and ask LLM
         P_j = assemble_prompt(x, C)
@@ -117,8 +117,8 @@ class Human(Agent):
         D, M, C = delta
 
         # current session & example
-        sess, x = D[-1]
-        img, y, e = x
+        x, sess = D[-1]
+        y, img, e = x
         encoded_img = encode_image(img)
 
         # get prev machine response
@@ -150,13 +150,13 @@ class Human(Agent):
             l_h = "refute"
             human_response = {
                 "role": "user",
-                "content": f"The diagnosis about {y_m} is incorrect, but the explanation is correct. Please correct the diagnosis."
+                "content": f"The diagnosis about {y} is incorrect, but the explanation is correct. Please correct the diagnosis."
             }
         elif matchOK and not agreeOK:
             l_h = "refute"
             human_response = {
                 "role": "user",
-                "content": f"The diagnosis about {y_m} is correct, but the explanation is incorrect. Please correct the explanation. The correct explanation is {e}."
+                "content": f"The diagnosis about {y} is correct, but the explanation is incorrect. Please correct the explanation. The correct explanation is {e}."
             }
         else:
             if j > k:
