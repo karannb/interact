@@ -50,6 +50,9 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
             mu_m, C = machine.ask(j, k, (D, M, C)) # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
+            if mu_m[0] == "problem":
+                j -= 1
+                continue
             if mu_m[0] == "revise":
                 l_m_revision = True
 
@@ -65,11 +68,11 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
         # only check for ratify because, in this special case,
         # human agent can never revise.
         l_h, l_m = mu_h[0], mu_m[0]
-        if mu_h[0] == "ratify":
+        if l_h == "ratify":
             one_way_human += 1
-        if mu_m[0] == "ratify" or l_m_revision:
+        if l_m == "ratify" or l_m_revision:
             one_way_machine += 1
-        if (mu_h[0] == "ratify") and (mu_m[0] == "ratify" or l_m_revision):
+        if (l_h == "ratify") and (l_m == "ratify" or l_m_revision):
             two_way_human += 1
             two_way_machine += 1
 

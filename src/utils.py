@@ -67,7 +67,7 @@ def assemble_prompt(x, c_j) -> Prompt:
         return messages
     else:
         copied_c_j = deepcopy(c_j)
-        copied_c_j.extend(messages)
+        copied_c_j += messages
         return copied_c_j
 
 

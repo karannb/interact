@@ -73,13 +73,16 @@ class Machine(Agent):
         # assemble prompt and ask LLM
         P_j = assemble_prompt(x, C)
         response = self.llm(messages=P_j)
-        y, e, C = parse_response(response, C)
+        try:
+            y, e, C = parse_response(response, C)
+        except AssertionError as e:
+            return ("problem", 0, 0), C
 
         # get label for the machine
         l_m = None
         # if j <= 2, we don't have human's response yet
         if (j > 2):
-            _, y_h, e_h = M[-1]
+            _, y_h, e_h = M[-1][3]
             matchOK = match(y, y_h)
             agreeOK = agree(e, e_h)
             if not matchOK and not agreeOK:
@@ -139,8 +142,8 @@ class Human(Agent):
                         "text": "Both the diagnosis and the explanation are correct. Great job!"
                     },
                     {
-                        "type": "img_url",
-                        "img_url": {
+                        "type": "image_url",
+                        "image_url": {
                             "url": f"data:image/jpeg;base64,{encoded_img}"
                         }
                     }
@@ -169,6 +172,7 @@ class Human(Agent):
                 }
 
         # append the human response to the conversation
-        C.append(human_response)
+        if human_response is not None:
+            C.append(human_response)
 
         return (l_h, y, e), C
