@@ -2,7 +2,9 @@ import sys
 sys.path.append("./")
 
 import uuid
+import pandas as pd
 from typing import List
+from argparse import ArgumentParser
 from src.agent import Machine, Human
 
 
@@ -89,8 +91,12 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
 
 
 if __name__ == "__main__":
-    import pandas as pd
     data = pd.read_csv("data/xray_data_filtered.csv", index_col=None)
     data = data.drop(columns=["case", "label_short"], inplace=False)
     iterdata = data.iterrows()
-    Interact(iterdata, h=1, m=2, n=3)
+
+    parser = ArgumentParser()
+    parser.add_argument("--n", "-num_iter", type=int, default=3)
+    args = parser.parse_args()
+
+    Interact(iterdata, h=1, m=2, n=args.n)
