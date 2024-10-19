@@ -9,13 +9,13 @@ from src.utils import (
 
 import os
 from openai import OpenAI
-# openai_org = os.getenv("OPENAI_ORG")
-# openai_project = os.getenv("OPENAI_PROJECT")
-# openai_key = os.getenv("OPENAI_KEY")
+openai_org = os.getenv("OPENAI_ORG")
+openai_project = os.getenv("OPENAI_PROJECT")
+openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
-    organization="org-FS3BNL7yaD4kX7b68zAMckVr",
-    project="proj_eHzIByecPCksPXepXpcAB9cT",
-    api_key="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"
+    organization=openai_org,
+    project=openai_project,
+    api_key=openai_key
 )
 
 

@@ -42,6 +42,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
         # Generate a random session identifier and store the input data
         sess = uuid.uuid4().hex[:4]
         total_sessions += 1
+        label, _, _ = x
         D.append((x, sess))
 
         j = 0
@@ -64,7 +65,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
             j += 1
 
             # stopping condition
-            done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
+            done = (j >= n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
             tags.extend([f"Machine: {mu_m[0]}", f"Human: {mu_h[0]}"])
 
         # only check for ratify because, in this special case,
@@ -80,7 +81,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
 
         # store the tags
         with open("tags.txt", "a") as f:
-            f.write(f"sessionID-{sess} ::: tags-{tags}\n")
+            f.write(f"sessionID-{sess}, ailment-{label} ::: tags-{tags}\n")
 
     print(f"Total Sessions: {total_sessions}")
     print(f"One-way Human: {one_way_human}")
@@ -91,12 +92,13 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("data/xray_data_filtered.csv", index_col=None)
-    data = data.drop(columns=["case", "label_short"], inplace=False)
-    iterdata = data.iterrows()
 
     parser = ArgumentParser()
-    parser.add_argument("--n", "-num_iter", type=int, default=3)
+    parser.add_argument("--n", "--num_iter", type=int, default=3)
+    parser.add_argument("--num_ailments", type=int, default=3, choices=[3, 5, 7])
     args = parser.parse_args()
 
+    data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
+    data = data.drop(columns=["case", "label_short"], inplace=False)
+    iterdata = data.iterrows()
     Interact(iterdata, h=1, m=2, n=args.n)
