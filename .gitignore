@@ -1,3 +1,4 @@
 *temp*
+results/
+tags*.txt
 __pycache__/
-tags.txt

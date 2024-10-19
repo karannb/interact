@@ -1,7 +1,9 @@
 import sys
 sys.path.append("./")
 
+import os
 import uuid
+import pickle
 import pandas as pd
 from typing import List
 from argparse import ArgumentParser
@@ -34,7 +36,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
     # metrics
     total_sessions = 0
     one_way_human, one_way_machine = 0, 0
-    two_way_human, two_way_machine = 0, 0
+    two_way = 0
     l_m_revision = False
 
     # Iterate over all input data
@@ -76,8 +78,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
         if l_m == "ratify" or l_m_revision:
             one_way_machine += 1
         if (l_h == "ratify") and (l_m == "ratify" or l_m_revision):
-            two_way_human += 1
-            two_way_machine += 1
+            two_way += 1
 
         # store the tags
         with open("tags.txt", "a") as f:
@@ -86,8 +87,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
     print(f"Total Sessions: {total_sessions}")
     print(f"One-way Human: {one_way_human}")
     print(f"One-way Machine: {one_way_machine}")
-    print(f"Two-way Human: {two_way_human}")
-    print(f"Two-way Machine: {two_way_machine}")
+    print(f"Two-way: {two_way}")
     return D, M, C
 
 
@@ -95,10 +95,19 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument("--n", "--num_iter", type=int, default=3)
-    parser.add_argument("--num_ailments", type=int, default=3, choices=[3, 5, 7])
+    parser.add_argument("--num_ailments", type=int, default=5, choices=[3, 5, 7])
     args = parser.parse_args()
 
     data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
     data = data.drop(columns=["case", "label_short"], inplace=False)
     iterdata = data.iterrows()
-    Interact(iterdata, h=1, m=2, n=args.n)
+    D, M, C = Interact(iterdata, h=1, m=2, n=args.n)
+    # save the relational databases
+    if not os.path.exists("results"):
+        os.makedirs("results")
+    with open("results/data.pkl", "wb") as f:
+        pickle.dump(D, f)
+    with open("results/messages.pkl", "wb") as f:
+        pickle.dump(M, f)
+    with open("results/context.pkl", "wb") as f:
+        pickle.dump(C, f)
