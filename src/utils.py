@@ -104,6 +104,7 @@ def agree(e, e_pred) -> bool:
     # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
     completion = client.chat.completions.create(
         model="gpt-4",
+        temperature=0.0,
         messages=[
             {
                 "role": "system",

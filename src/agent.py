@@ -1,4 +1,5 @@
 from typing import Tuple
+from copy import deepcopy
 from functools import partial
 from src.utils import (
     agree, 
@@ -74,9 +75,14 @@ class Machine(Agent):
         P_j = assemble_prompt(x, C)
         response = self.llm(messages=P_j)
         try:
-            y, e, C = parse_response(response, C)
+            copied_C = deepcopy(C)
+            y, e, new_C = parse_response(response, copied_C)
         except AssertionError as e:
+            print(f"Problem in response {response} at j={j}, redoing...")
             return ("problem", 0, 0), C
+
+        # update context if the response is valid
+        C = new_C
 
         # get label for the machine
         l_m = None

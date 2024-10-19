@@ -57,6 +57,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
             j += 1
             if mu_m[0] == "problem":
                 j -= 1
+                M = M[:-1]
                 continue
             if mu_m[0] == "revise":
                 l_m_revision = True
