@@ -12,7 +12,7 @@ python src/interact.py --num_iter=4 --num_ailments=5
 This will output the counts of one-way and two-way intelligible sessions, create a tags.txt file of the actual tags exchanged between the two agents and also save the D, M and C (from paper section ...) to the `results/` folder.
 You can also change the `num_iter` field to reproduce Figure x in the paper.
 
-![Figure](assets/boxplot.png)
+![Figure](assets/trend.png)
 
 ### Data
 We provide our own dataset consisting of Xrays, over 3, 5 and 7 ailments.
