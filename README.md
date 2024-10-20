@@ -7,10 +7,10 @@ Official Implementation for the intelligibility protocol (PXP).
 ### Reproducing our results
 To reproduce our results, you can run the following command:
 ```bash
-python src/interact.py --num_iter=4 --num_ailments=5
+python src/interact.py --num_iter=5
 ```
-This will output the counts of one-way and two-way intelligible sessions, create a tags.txt file of the actual tags exchanged between the two agents and also save the D, M and C (from paper section ...) to the `results/` folder.
-You can also change the `num_iter` field to reproduce Figure x in the paper.
+This will output the counts of one-way and two-way intelligible sessions, create a tags.txt file of the actual tags exchanged between the two agents and also save the D (`data.pkl`), M (`messages.pkl`) and C (`context.pkl`) (from Procedure 1 in the paper) to the `results/` folder.
+To reproduce the trend in Figure 3 from the paper, we ran the above command 5 times and manually extracted how many one-way intelligible sessions (upto an interaction limit) were generated per agent.
 
 ![Figure](assets/trend.png)
 
