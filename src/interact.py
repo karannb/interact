@@ -63,7 +63,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
                 l_m_revision = True
 
             # ask the human
-            mu_h, C = human.ask(j, k, (D, M, C))
+            mu_h, C = human.ask(j, k, (D, M, C)) # (tag, pred, expl, human_response) and context
             M += [(sess, j, h, mu_h, m)]
             j += 1
 

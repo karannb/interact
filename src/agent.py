@@ -70,25 +70,26 @@ class Machine(Agent):
 
         # current session & example
         x, sess = D[-1]
+        y, _, e = x
 
         # assemble prompt and ask LLM
         P_j = assemble_prompt(x, C)
         response = self.llm(messages=P_j)
         try:
             copied_C = deepcopy(C)
-            y, e, new_C = parse_response(response, copied_C)
+            y_m, e_m, new_C = parse_response(response, copied_C)
         except AssertionError as e:
             print(f"Problem in response {response} at j={j}, redoing...")
-            return ("problem", 0, 0), C
+            return ("problem", -1, -1), C
 
         # update context if the response is valid
         C = new_C
 
         # get label for the machine
         l_m = None
-        # if j <= 2, we don't have human's response yet
-        if (j > 2):
-            _, y_h, e_h = M[-1][3]
+        # if j < 2, we don't have human's response yet
+        if (j >= 2):
+            _, y_h, e_h, _ = M[-1][3]
             matchOK = match(y, y_h)
             agreeOK = agree(e, e_h)
             if not matchOK and not agreeOK:
@@ -101,7 +102,7 @@ class Machine(Agent):
         else:
             l_m = "revise"
 
-        return (l_m, y, e), C
+        return (l_m, y_m, e_m), C
 
 
 class Human(Agent):
@@ -181,4 +182,4 @@ class Human(Agent):
         if human_response is not None:
             C.append(human_response)
 
-        return (l_h, y, e), C
+        return (l_h, y, e, human_response), C

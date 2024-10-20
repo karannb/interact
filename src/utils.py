@@ -40,15 +40,16 @@ def assemble_prompt(x, c_j) -> Prompt:
     messages = [
         {
             "role": "system",
-            "content": "You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax."
+            "content": """You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+            Adhere to the following output format strictly, no extra text:
+            *Prediction: Yes/No*
+            *Explanation: <Your explanation here>*
+            """
         },
         {
             "role": "user",
             "content": f"""
-            Given the following chest XRay, you have to predict the existence of {y}.
-            Adhere to the following output format strictly, no extra text:
-            *Prediction: Yes/No*
-            *Explanation: <Your explanation here>*
+            Given the following chest XRay, you have to predict the presence of {y}.
             """
         },
         {
@@ -151,7 +152,7 @@ def parse_response(response, C: Optional[List]) -> Tuple:
 
     # add to the context
     response_conv = {
-        "role": "system",
+        "role": "assistant",
         "content": response
     }
     if C != None:
