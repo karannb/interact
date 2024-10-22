@@ -4,7 +4,7 @@ Official Implementation for the intelligibility protocol (PXP).
 
 [![arXiv](https://img.shields.io/badge/arXiv-TBD-b31b1b.svg)](https://arxiv.org/abs/TBD)
 
-![Figure](assets/conversations.pdf)
+![Figure](assets/conv.png)
 
 ### Reproducing our results
 To reproduce our results, you can run the following command:
