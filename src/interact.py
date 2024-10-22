@@ -47,7 +47,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
         label, _, _ = x
         D.append((x, sess))
 
-        j = 0
+        j = 1
         tags = []
         done = False
         while not done:
@@ -55,20 +55,21 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
             mu_m, C = machine.ask(j, k, (D, M, C)) # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
-            if mu_m[0] == "problem":
-                j -= 1
-                M = M[:-1]
-                continue
             if mu_m[0] == "revise":
                 l_m_revision = True
 
-            # ask the human
-            mu_h, C = human.ask(j, k, (D, M, C)) # (tag, pred, expl, human_response) and context
-            M += [(sess, j, h, mu_h, m)]
-            j += 1
-
             # stopping condition
-            done = (j >= n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
+            done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
+
+            if not done:
+                # ask the human
+                mu_h, C = human.ask(j, k, (D, M, C)) # (tag, pred, expl, human_response) and context
+                M += [(sess, j, h, mu_h, m)]
+                j += 1
+
+                # stopping condition
+                done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
+
             tags.extend([f"Machine: {mu_m[0]}", f"Human: {mu_h[0]}"])
 
         # only check for ratify because, in this special case,

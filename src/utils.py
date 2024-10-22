@@ -113,7 +113,7 @@ def agree(e, e_pred) -> bool:
             },
             {
                 "role": "user",
-                "content": f"Given {e} is a correct diagnosis/explanation of an XRay, do you agree that {e_pred} is also a correct diagnosis/explanation? Respond only in Yes/No."
+                "content": f"Given A: {e} is a diagnosis/explanation of an XRay, and B: {e_pred} is another diagnosis/explanation of an XRay, are these two consistent? Respond only in Yes/No."
             },
         ]
     )

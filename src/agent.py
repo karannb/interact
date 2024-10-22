@@ -1,6 +1,6 @@
-from typing import Tuple
 from copy import deepcopy
 from functools import partial
+from typing import Tuple, List, Dict
 from src.utils import (
     agree, 
     match, 
@@ -29,9 +29,9 @@ class Agent:
         self.type = type
         self.id = id
 
-    def ask(self, j: int, k: int, delta: Tuple) -> Tuple:
+    def call(self, j: int, k: int, delta: Tuple) -> Tuple:
         """
-        Ask the agent for a response.
+        Call the agent for a response.
 
         Args:
             j (int): interaction identifier
@@ -40,6 +40,114 @@ class Agent:
 
         Returns:
             Tuple: response (tag, pred, expl)
+        """
+        D, M, C = delta # we don't need to set C_0 = None, because that's already done.
+
+        # current session & example
+        x, sess = D[-1]
+
+        # check if we have crossed 2 interactions
+        if j > 2:
+            lp, yp, ep = M[-1][3] # message from prev agent
+            lpp, ypp, epp = M[-2][3] # message from prev prev agent
+            # now check for categories
+            matchOK = match(yp, ypp)
+            agreeOK = agree(ep, epp)
+            catA = matchOK and agreeOK
+            catB = matchOK and not agreeOK
+            catC = not matchOK and agreeOK
+            catD = not matchOK and not agreeOK
+
+        # ask the agent, the "problem" part is needed to 
+        # handle the case when the response is invalid
+        # for the machine agent
+        y_hat = "problem"
+        while y_hat == "problem":
+            y_hat, e_hat, C = self.ask(x, C)
+
+        # again, check if we have crossed 2 interactions
+        if j > 2:
+            change = (not match(ypp, y_hat)) or (not agree(epp, e_hat))
+            # assign label
+            if catA:
+                l_hat = "ratify"
+            elif catB or catC:
+                if change:
+                    l_hat = "revise"
+                else:
+                    l_hat = "refute"
+            elif catD:
+                if j > k:
+                    l_hat = "reject"
+                elif change:
+                    l_hat = "revise"
+                else:
+                    l_hat = "refute"
+        else:
+            l_hat = "revise"
+
+        # update context
+        C = self.update_context(C, x, l_hat, j)
+
+        return (l_hat, y_hat, e_hat), C
+    
+    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+        """
+        Updates context, i.e. the conversation to make it more conversation-like.
+
+        Args:
+            C (List[Dict]): Current context
+            x (Tuple): example of (y, img, e)
+            mu (Tuple): tuple of (l, y, e)
+            j (int): interaction identifier
+
+        Returns:
+            List[Dict]: new context
+        """
+        _, img, _ = x
+        if j == 1 or j == 2:
+            # first messages are just information about the models
+            C[-1]["content"] = "This is my opinion on the X-Ray: " + C[-1]["content"]
+        else:
+            if l_hat == "ratify":
+                C[-1]["content"] = "Our opinions match. I agree with you." + C[-1]["content"]
+                # now for ratify, we need to add the image
+                encoded_img = encode_image(img)
+                new_content = {
+                    "role": "user" if self.type == "Human" else "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": C[-1]["content"]
+                            },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encoded_img}"
+                            }
+                        }
+                    ]
+                }
+                C[-1] = new_content
+            elif l_hat == "reject":
+                C[-1]["content"] = "I disagree with you. Our opinions do not match." + C[-1]["content"]
+            elif l_hat == "revise":
+                C[-1]["content"] = "I think I made a mistake. I will revise my opinion." + C[-1]["content"]
+            elif l_hat == "refute":
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion." + C[-1]["content"]
+
+        return C
+
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+        """
+        Ask the agent for a response.
+
+        Args:
+            x (Tuple): example of (y, img, e)
+            C (List[Dict]): context
+
+        Returns:
+            Tuple: prediction and explanation
         """
         raise NotImplementedError("Subclass must implement abstract method.")
 
@@ -54,23 +162,17 @@ class Machine(Agent):
                            model="gpt-4o",
                            max_tokens=300)
 
-    def ask(self, j: int, k: int, delta: Tuple) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
         """
         Ask the machine for a response.
-
+        
         Args:
-            j (int): interaction identifier
-            k (int): the minimum number of interactions after which the "Reject" tag can be sent
-            delta (Tuple): context of the conversation
+            x (Tuple): example of (y, img, e)
+            C (List[Dict]): context
 
         Returns:
-            Tuple: response (tag, pred, expl)
+            Tuple: prediction, explanation and updated context
         """
-        D, M, C = delta
-
-        # current session & example
-        x, sess = D[-1]
-        y, _, e = x
 
         # assemble prompt and ask LLM
         P_j = assemble_prompt(x, C)
@@ -79,30 +181,13 @@ class Machine(Agent):
             copied_C = deepcopy(C)
             y_m, e_m, new_C = parse_response(response, copied_C)
         except AssertionError as e:
-            print(f"Problem in response {response} at j={j}, redoing...")
-            return ("problem", -1, -1), C
+            print(f"Problem {e} in response {response}, redoing...")
+            return ("problem", -1), C
 
         # update context if the response is valid
         C = new_C
 
-        # get label for the machine
-        l_m = None
-        # if j < 2, we don't have human's response yet
-        if (j >= 2):
-            _, y_h, e_h, _ = M[-1][3]
-            matchOK = match(y, y_h)
-            agreeOK = agree(e, e_h)
-            if not matchOK and not agreeOK:
-                if j > k:
-                    l_m = "reject"
-                else:
-                    l_m = "refute"
-            else:
-                l_m = "revise"
-        else:
-            l_m = "revise"
-
-        return (l_m, y_m, e_m), C
+        return y_m, e_m, C
 
 
 class Human(Agent):
@@ -112,74 +197,18 @@ class Human(Agent):
     def __init__(self, id: int):
         super().__init__("Human", id)
 
-    def ask(self, j: int, k: int, delta: Tuple) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
         """
         Ask the human for a response.
 
         Args:
-            j (int): interaction identifier
-            k (int): the minimum number of interactions after which the "Reject" tag can be sent
-            delta (Tuple): context of the conversation
+            x (Tuple): example of (y, img, e)
+            C (List[Dict]): context
 
         Returns:
-            Tuple: response (tag, pred, expl)
+            Tuple: prediction, explanation and updated context
         """
-        D, M, C = delta
-
         # current session & example
-        x, sess = D[-1]
-        y, img, e = x
-        encoded_img = encode_image(img)
+        y, _, e = x
 
-        # get prev machine response
-        mu_m = M[-1][3]
-        _, y_m, e_m = mu_m
-
-        # get label
-        l_h, human_response = None, None
-        matchOK = match(y, y_m)
-        agreeOK = agree(e, e_m)
-        if matchOK and agreeOK:
-            l_h = "ratify"
-            human_response = {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Both the diagnosis and the explanation are correct. Great job!"
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{encoded_img}"
-                        }
-                    }
-                ]
-            }
-        elif not matchOK and agreeOK:
-            l_h = "refute"
-            human_response = {
-                "role": "user",
-                "content": f"The diagnosis about {y} is incorrect, but the explanation is correct. Please correct the diagnosis."
-            }
-        elif matchOK and not agreeOK:
-            l_h = "refute"
-            human_response = {
-                "role": "user",
-                "content": f"The diagnosis about {y} is correct, but the explanation is incorrect. Please correct the explanation. The correct explanation is {e}."
-            }
-        else:
-            if j > k:
-                l_h = "reject"
-            else:
-                l_h = "refute"
-                human_response = {
-                    "role": "user",
-                    "content": f"Both the diagnosis and the explanation are incorrect. Please correct both. The correct explanation is {e}."
-                }
-
-        # append the human response to the conversation
-        if human_response is not None:
-            C.append(human_response)
-
-        return (l_h, y, e, human_response), C
+        return y, e, C
