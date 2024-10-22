@@ -37,7 +37,7 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
     total_sessions = 0
     one_way_human, one_way_machine = 0, 0
     two_way = 0
-    l_m_revision = False
+    l_m_revision, l_h_revision = False, False
 
     # Iterate over all input data
     for idx, x in data:
@@ -52,30 +52,35 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
         done = False
         while not done:
             # ask the machine
-            mu_m, C = machine.ask(j, k, (D, M, C)) # (tag, pred, expl) and context
+            mu_m, C = machine.call(j, k, (D, M, C)) # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
             if mu_m[0] == "revise":
                 l_m_revision = True
 
             # stopping condition
-            done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
+            done = (j > n) or (mu_m[0] == "ratify") or (mu_m[0] == "reject")
 
             if not done:
                 # ask the human
-                mu_h, C = human.ask(j, k, (D, M, C)) # (tag, pred, expl, human_response) and context
+                mu_h, C = human.call(j, k, (D, M, C)) # (tag, pred, expl, human_response) and context
                 M += [(sess, j, h, mu_h, m)]
                 j += 1
+                if mu_h[0] == "revise":
+                    l_h_revision = True
 
                 # stopping condition
                 done = (j > n) or (mu_h[0] == "ratify") or (mu_h[0] == "reject")
 
-            tags.extend([f"Machine: {mu_m[0]}", f"Human: {mu_h[0]}"])
+            if (mu_m[0] == "ratify") or (mu_m[0] == "reject"):
+                tags.extend([f"Machine: {mu_m[0]}"])
+            else:
+                tags.extend([f"Machine: {mu_m[0]}", f"Human: {mu_h[0]}"])
 
         # only check for ratify because, in this special case,
         # human agent can never revise.
         l_h, l_m = mu_h[0], mu_m[0]
-        if l_h == "ratify":
+        if l_h == "ratify" or l_h_revision:
             one_way_human += 1
         if l_m == "ratify" or l_m_revision:
             one_way_machine += 1

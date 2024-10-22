@@ -68,6 +68,7 @@ class Agent:
         # again, check if we have crossed 2 interactions
         if j > 2:
             change = (not match(ypp, y_hat)) or (not agree(epp, e_hat))
+            import pdb; pdb.set_trace()
             # assign label
             if catA:
                 l_hat = "ratify"
@@ -110,11 +111,11 @@ class Agent:
             C[-1]["content"] = "This is my opinion on the X-Ray: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you." + C[-1]["content"]
+                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified." + C[-1]["content"]
                 # now for ratify, we need to add the image
                 encoded_img = encode_image(img)
                 new_content = {
-                    "role": "user" if self.type == "Human" else "assistant",
+                    "role": "user",
                     "content": [
                         {
                             "type": "text",
@@ -128,9 +129,9 @@ class Agent:
                         }
                     ]
                 }
-                C[-1] = new_content
+                C.append(new_content)
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you. Our opinions do not match." + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion." + C[-1]["content"]
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I will revise my opinion." + C[-1]["content"]
             elif l_hat == "refute":
