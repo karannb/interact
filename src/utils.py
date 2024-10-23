@@ -78,7 +78,7 @@ def match(y, pred) -> bool:
     Match the prediction with the example.
 
     Args:
-        y: ground truth (unused right now, but might be useful in the future)
+        y: ground truth
         pred: prediction
 
     Returns:

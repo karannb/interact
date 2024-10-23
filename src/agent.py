@@ -46,18 +46,6 @@ class Agent:
         # current session & example
         x, sess = D[-1]
 
-        # check if we have crossed 2 interactions
-        if j > 2:
-            lp, yp, ep = M[-1][3] # message from prev agent
-            lpp, ypp, epp = M[-2][3] # message from prev prev agent
-            # now check for categories
-            matchOK = match(yp, ypp)
-            agreeOK = agree(ep, epp)
-            catA = matchOK and agreeOK
-            catB = matchOK and not agreeOK
-            catC = not matchOK and agreeOK
-            catD = not matchOK and not agreeOK
-
         # ask the agent, the "problem" part is needed to 
         # handle the case when the response is invalid
         # for the machine agent
@@ -65,9 +53,26 @@ class Agent:
         while y_hat == "problem":
             y_hat, e_hat, C = self.ask(x, C)
 
-        # again, check if we have crossed 2 interactions
-        if j > 2:
+        # check if we have crossed 2 interactions
+        if j >= 2:
+            _, yp, ep = M[-1][3] # message from prev agent
+            if j == 2:
+                ypp, epp = y_hat, e_hat
+            else:
+                _, ypp, epp = M[-2][3] # message from prev prev agent
+            # now check for categories
+            if j % 2 == 0: # human
+                # check `match` for why this is done
+                matchOK = match(ypp, yp)
+            else: # machine
+                matchOK = match(yp, ypp)
+            agreeOK = agree(ep, epp)
+            catA = matchOK and agreeOK
+            catB = matchOK and not agreeOK
+            catC = not matchOK and agreeOK
+            catD = not matchOK and not agreeOK
             change = (not match(ypp, y_hat)) or (not agree(epp, e_hat))
+
             # assign label
             if catA:
                 l_hat = "ratify"
@@ -110,31 +115,32 @@ class Agent:
             C[-1]["content"] = "This is my initial opinion on the X-Ray: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified." + C[-1]["content"]
-                # now for ratify, we need to add the image
-                encoded_img = encode_image(img)
-                new_content = {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": C[-1]["content"]
-                            },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{encoded_img}"
+                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                # now for ratify, we need to add the image (if it has not been added before)
+                if not isinstance(C[-2]["content"], list):
+                    encoded_img = encode_image(img)
+                    new_content = {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": C[-1]["content"]
+                                },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{encoded_img}"
+                                }
                             }
-                        }
-                    ]
-                }
-                C.append(new_content)
+                        ]
+                    }
+                    C.append(new_content)
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion." + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. " + C[-1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I will revise my opinion." + C[-1]["content"]
+                C[-1]["content"] = "I think I made a mistake. I will revise my opinion. " + C[-1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion." + C[-1]["content"]
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
 
         return C
 
@@ -214,7 +220,7 @@ class Human(Agent):
         # add the human's response to the context
         human_response = {
             "role": "user",
-            "content": f"""*Prediction: {y}*
+            "content": f"""*Prediction: Yes*
             *Explanation: {e}*"""
         }
         C.append(human_response)
