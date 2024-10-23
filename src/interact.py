@@ -103,7 +103,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
-    data = data.drop(columns=["case", "label_short"], inplace=False)
+    data = data.drop(columns=["case", "label_short", "link"], inplace=False)
     iterdata = data.iterrows()
     D, M, C = Interact(iterdata, h=1, m=2, n=args.n)
     # save the relational databases
