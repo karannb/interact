@@ -1,12 +1,8 @@
 from copy import deepcopy
 from functools import partial
+from abc import abstractmethod
 from typing import Tuple, List, Dict
-from src.utils import (
-    agree, 
-    match, 
-    encode_image, 
-    parse_response, 
-    assemble_prompt)
+from src.utils import RAD, DRUG, encode_image
 
 import os
 from openai import OpenAI
@@ -28,6 +24,10 @@ class Agent:
     def __init__(self, type: str, id: int):
         self.type = type
         self.id = id
+
+        # these are set in the subclasses
+        self.match = None
+        self.agree = None
 
     def call(self, j: int, k: int, delta: Tuple) -> Tuple:
         """
@@ -63,15 +63,15 @@ class Agent:
             # now check for categories
             if j % 2 == 0: # human
                 # check `match` for why this is done
-                matchOK = match(ypp, yp)
+                matchOK = self.match(ypp, yp)
             else: # machine
-                matchOK = match(yp, ypp)
-            agreeOK = agree(ep, epp)
+                matchOK = self.match(yp, ypp)
+            agreeOK = self.agree(ep, epp)
             catA = matchOK and agreeOK
             catB = matchOK and not agreeOK
             catC = not matchOK and agreeOK
             catD = not matchOK and not agreeOK
-            change = (not match(ypp, y_hat)) or (not agree(epp, e_hat))
+            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat))
 
             # assign label
             if catA:
@@ -90,12 +90,62 @@ class Agent:
                     l_hat = "refute"
         else:
             l_hat = "init"
+            matchOK, agreeOK, change = None, None, None
 
         # update context
         C = self.update_context(C, x, l_hat, j)
 
         return (l_hat, y_hat, e_hat), C
     
+    @abstractmethod
+    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+        """
+        Updates context, i.e. the conversation to make it more conversation-like.
+
+        Args:
+            C (List[Dict]): Current context
+            x (Tuple): example of (y, img, e)
+            mu (Tuple): tuple of (l, y, e)
+            j (int): interaction identifier
+
+        Returns:
+            List[Dict]: new context
+        """
+        raise NotImplementedError("Subclass must implement abstract method.")
+
+    @abstractmethod
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+        """
+        Ask the agent for a response.
+
+        Args:
+            x (Tuple): example of (y, img, e)
+            C (List[Dict]): context
+
+        Returns:
+            Tuple: prediction and explanation
+        """
+        raise NotImplementedError("Subclass must implement abstract method.")
+
+
+"""
+RAD Task agents.
+"""
+
+
+class RADAgent(Agent):
+    """
+    Agent class for the RAD task.
+    """
+    def __init__(self, type: str, id: int):
+        super().__init__(type, id)
+
+        # Task-wise parse_response and assemble_prompt are defined in utils.py
+        self.parse_response = RAD.parse_response
+        self.assemble_prompt = RAD.assemble_prompt
+        self.match = RAD.match
+        self.agree = RAD.agree
+
     def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
         """
         Updates context, i.e. the conversation to make it more conversation-like.
@@ -124,7 +174,7 @@ class Agent:
                         "content": [
                             {
                                 "type": "text",
-                                "text": C[-1]["content"]
+                                "text": "This is the image for further reference."
                                 },
                             {
                                 "type": "image_url",
@@ -144,6 +194,7 @@ class Agent:
 
         return C
 
+    @abstractmethod
     def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
         """
         Ask the agent for a response.
@@ -158,7 +209,7 @@ class Agent:
         raise NotImplementedError("Subclass must implement abstract method.")
 
 
-class Machine(Agent):
+class RADMachine(RADAgent):
     """
     Machine agent class.
     """
@@ -181,11 +232,11 @@ class Machine(Agent):
         """
 
         # assemble prompt and ask LLM
-        P_j = assemble_prompt(x, C)
+        P_j = self.assemble_prompt(x, C)
         response = self.llm(messages=P_j)
         try:
             copied_C = deepcopy(C)
-            y_m, e_m, new_C = parse_response(response, copied_C)
+            y_m, e_m, new_C = self.parse_response(response, copied_C)
         except AssertionError as e:
             print(f"Problem {e} in response {response}, redoing...")
             return "problem", -1, C
@@ -196,7 +247,7 @@ class Machine(Agent):
         return y_m, e_m, C
 
 
-class Human(Agent):
+class RADHuman(RADAgent):
     """
     Human agent class.
     """
@@ -226,3 +277,199 @@ class Human(Agent):
         C.append(human_response)
 
         return y, e, C
+
+
+"""
+DRUG Task agents.
+"""
+
+
+class DRUGAgent(Agent):
+    """
+    Agent class for the DRUG task.
+    """
+    def __init__(self, type: str, id: int):
+        super().__init__(type, id)
+
+        # Task-wise parse_response and assemble_prompt are defined in utils.py
+        self.parse_response = DRUG.parse_response
+        self.assemble_prompt = DRUG.assemble_prompt
+        self.match = DRUG.match
+        self.agree = DRUG.agree
+
+    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+        """
+        Updates context, i.e. the conversation to make it more conversation-like.
+
+        Args:
+            C (List[Dict]): Current context
+            x (Tuple): example of (y, mol)
+            mu (Tuple): tuple of (l, y, e)
+            j (int): interaction identifier
+
+        Returns:
+            List[Dict]: new context
+        """
+        # get the molecule being discussed
+        _, mol = x
+
+        if j == 1 or j == 2:
+            # first messages are just information about the models
+            C[-1]["content"] = "This is the preliminary retrosynthesis pathway I propose: " + C[-1]["content"]
+        else:
+            if l_hat == "ratify":
+                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                # now for ratify, we need to add the molecule (if it has not been added before)
+                if not isinstance(C[-2]["content"], list):
+                    new_content = {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "This is the molecule for further reference."
+                                },
+                            {
+                                "type": "text",
+                                "text": mol
+                            }
+                        ]
+                    }
+                    C.append(new_content)
+            elif l_hat == "reject":
+                C[-1]["content"] = "I disagree with you and reject your opinion. " + C[-1]["content"]
+            elif l_hat == "revise":
+                C[-1]["content"] = "I think I made a mistake. I will revise my opinion. " + C[-1]["content"]
+            elif l_hat == "refute":
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
+
+        return C
+
+    @abstractmethod
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+        """
+        Ask the agent for a response.
+
+        Args:
+            x (Tuple): example of (y, mol, e)
+            C (List[Dict]): context
+
+        Returns:
+            Tuple: prediction and explanation
+        """
+        raise NotImplementedError("Subclass must implement abstract method.")
+
+
+class DRUGMachine(DRUGAgent):
+    """
+    Machine agent class.
+    """
+    def __init__(self, id: int):
+        super().__init__("Machine", id)
+        self.llm = partial(client.chat.completions.create, 
+                           model="gpt-o1-preview",
+                           max_tokens=300)
+
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+        """
+        Ask the machine for a response.
+
+        Args:
+            x (Tuple): example of (y, mol, e)
+            C (List[Dict]): context
+
+        Returns:
+            Tuple: prediction, explanation and updated context
+        """
+        # assemble prompt and ask LLM
+        P_j = self.assemble_prompt(x, C)
+        response = self.llm(messages=P_j)
+        try:
+            copied_C = deepcopy(C)
+            y_m, e_m, new_C = self.parse_response(response, copied_C)
+        except AssertionError as e:
+            print(f"Problem {e} in response {response}, redoing...")
+            return "problem", -1, C
+
+        # update context if the response is valid
+        C = new_C
+
+        return y_m, e_m, C
+    
+
+class DRUGHuman(DRUGAgent):
+    """
+    Human agent that interacts using a CLI (Command Line Interface).
+    """
+    def __init__(self, id: int):
+        super().__init__("Human", id)
+
+    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+        """
+        Ask a Human for a response on the Command Line.
+
+        This method prompts a human user to provide a response on the command line.
+
+        Args:
+            x (Tuple): (y, mol) tuple.
+            C (List[Dict]): context
+
+        Returns:
+            Tuple: prediction, explanation and updated context
+        """
+        # show the current conversation
+        for c in C:
+            print(c["role"] + ": " + c["content"])
+
+        # current session & example
+        _, mol = x
+        print(f"The molecule: {mol}")
+
+        # take prediction input from the user
+        # this is necessary because there can be multiple pathways
+        y_h = input("Prediction: ")
+
+        # ask for explanation
+        e_h = input("Explanation: ")
+
+        # add the human's response to the context
+        human_response = {
+            "role": "user",
+            "content": f"""*Prediction: {y_h}*
+            *Explanation: {e_h}*"""
+        }
+        C.append(human_response)
+
+        return y_h, e_h, C
+
+
+"""
+Factory method to create agents.
+"""
+def create_agent(task: str, type: str, id: int):
+    """
+    Factory method to create agents.
+
+    Args:
+        task (str): task type
+        type (str): agent type
+        id (int): agent id
+
+    Returns:
+        Agent: agent object
+    """
+    if task == "RAD":
+        if type == "Machine":
+            return RADMachine(id)
+        elif type == "Human":
+            return RADHuman(id)
+        else:
+            raise ValueError(f"Invalid agent type: {type}")
+    elif task == "DRUG":
+        if type == "Machine":
+            return DRUGMachine(id)
+        elif type == "Human":
+            return DRUGHuman(id)
+        else:
+            raise ValueError(f"Invalid agent type: {type}")
+    else:
+        raise ValueError(f"Invalid task: {task}")

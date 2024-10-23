@@ -6,11 +6,11 @@ import uuid
 import pickle
 import pandas as pd
 from typing import List
+from src.agent import create_agent
 from argparse import ArgumentParser
-from src.agent import Machine, Human
 
 
-def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
+def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
     """
     Core interact function between the human and the machine.
 
@@ -28,11 +28,12 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
     # Initialize the relational databases
     D, M, C = [], [], None
     n *= 2 # number of interactions need to be doubled 
-    n += 2 # and 2 is added because the first two interactions are "initialization"
+    n += 1 # and 1 is added because the first interaction is "initialization"
 
     # Initialize the agents
-    human = Human(h)
-    machine = Machine(m)
+    assert task in ["RAD", "DRUG"], "Invalid task, expected 'RAD' or 'DRUG', got " + task
+    human = create_agent(task, "Human", h)
+    machine = create_agent(task, "Machine", m)
 
     # metrics
     total_sessions = 0
@@ -99,13 +100,14 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument("--n", "--num_iter", type=int, default=3)
+    parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
     parser.add_argument("--num_ailments", type=int, default=5, choices=[3, 5, 7])
     args = parser.parse_args()
 
     data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
     iterdata = data.iterrows()
-    D, M, C = Interact(iterdata, h=1, m=2, n=args.n)
+    D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
         os.makedirs("results")
