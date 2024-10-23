@@ -41,6 +41,7 @@ def assemble_prompt(x, c_j) -> Prompt:
         {
             "role": "system",
             "content": """You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+            It is also known that the user has access to an oracle with 100% prediction accuracy, so you can trust their predictions.
             Adhere to the following output format strictly, no extra text:
             *Prediction: Yes/No*
             *Explanation: <Your explanation here>*

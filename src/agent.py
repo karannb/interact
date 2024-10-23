@@ -68,7 +68,6 @@ class Agent:
         # again, check if we have crossed 2 interactions
         if j > 2:
             change = (not match(ypp, y_hat)) or (not agree(epp, e_hat))
-            import pdb; pdb.set_trace()
             # assign label
             if catA:
                 l_hat = "ratify"
@@ -85,7 +84,7 @@ class Agent:
                 else:
                     l_hat = "refute"
         else:
-            l_hat = "revise"
+            l_hat = "init"
 
         # update context
         C = self.update_context(C, x, l_hat, j)
@@ -108,7 +107,7 @@ class Agent:
         _, img, _ = x
         if j == 1 or j == 2:
             # first messages are just information about the models
-            C[-1]["content"] = "This is my opinion on the X-Ray: " + C[-1]["content"]
+            C[-1]["content"] = "This is my initial opinion on the X-Ray: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified." + C[-1]["content"]
@@ -160,7 +159,7 @@ class Machine(Agent):
     def __init__(self, id: int):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o",
+                           model="gpt-4o-mini",
                            max_tokens=300)
 
     def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
@@ -183,7 +182,7 @@ class Machine(Agent):
             y_m, e_m, new_C = parse_response(response, copied_C)
         except AssertionError as e:
             print(f"Problem {e} in response {response}, redoing...")
-            return ("problem", -1), C
+            return "problem", -1, C
 
         # update context if the response is valid
         C = new_C
@@ -211,5 +210,13 @@ class Human(Agent):
         """
         # current session & example
         y, _, e = x
+
+        # add the human's response to the context
+        human_response = {
+            "role": "user",
+            "content": f"""*Prediction: {y}*
+            *Explanation: {e}*"""
+        }
+        C.append(human_response)
 
         return y, e, C

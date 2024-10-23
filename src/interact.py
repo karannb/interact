@@ -27,7 +27,8 @@ def Interact(data, h: int, m: int, n: int, k: int = 3) -> List:
 
     # Initialize the relational databases
     D, M, C = [], [], None
-    n *= 2 # number of interactions need to be doubled
+    n *= 2 # number of interactions need to be doubled 
+    n += 2 # and 2 is added because the first two interactions are "initialization"
 
     # Initialize the agents
     human = Human(h)
