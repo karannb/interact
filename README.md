@@ -35,6 +35,18 @@ So, for the model to work with custom data, you would need some form of static h
 ### Real-time feedback
 With the DRUG task, one can create an analogous real-time feedback system, using the command line and a real expert human for feedback.
 
+### How to use the code for a different task
+Here, we precisely describe how to use the code for a different task, say MATS (i.e. Materials Science).
+- Decide the type of feedback you have access to, static (CSV with some predictions and explanations) or real-time (human expert)
+- If it is static then you would need to add the data to the `data/` folder.
+- Now, depeding on the type of feedback, you should implement a `MATSAgent` class in `src/agents.py` which should inherit from `Agent`, and borrow code from `RADAgent` (if static) and `DRUGAgent` (if real-time).
+- Following this, implement `MATSMachine` and `MATSHuman` classes in the same file.
+- Finally, you have to implement the `MATS` class in `src/utils.py` which should inherit from `Task` and borrow code from `RAD` and `DRUG` appropriately.
+- Now, you can run the code using the following command: (add this task to the choices for the `--task` argument)
+```bash
+python src/interact.py --num_iter=5 --task=MATS
+```
+
 
 ### Citation
 If you find this code useful, please consider citing our preprint:

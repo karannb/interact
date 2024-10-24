@@ -62,16 +62,23 @@ class Agent:
                 _, ypp, epp = M[-2][3] # message from prev prev agent
             # now check for categories
             if j % 2 == 0: # human
-                # check `match` for why this is done
+                # we decide to put the ground truth first 
+                # and then the prediction / generation
                 matchOK = self.match(ypp, yp)
+                agreeOK = self.agree(epp, ep)
             else: # machine
                 matchOK = self.match(yp, ypp)
-            agreeOK = self.agree(ep, epp)
+                agreeOK = self.agree(ep, epp)
             catA = matchOK and agreeOK
             catB = matchOK and not agreeOK
             catC = not matchOK and agreeOK
             catD = not matchOK and not agreeOK
             change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat))
+
+            # because change is an approximate test, we make sure that the there are no 
+            # ambiguities by manually resetting y_hat and e_hat to 2 turns ago
+            if not change:
+                y_hat, e_hat = ypp, epp
 
             # assign label
             if catA:
@@ -190,7 +197,8 @@ class RADAgent(Agent):
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I will revise my opinion. " + C[-1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
+                # because nothing changes, we send the same opinion again as 2 steps ago
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-3]["content"]
 
         return C
 
