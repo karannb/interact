@@ -6,7 +6,7 @@ import uuid
 import pickle
 import pandas as pd
 from typing import List
-from src.agent import create_agent
+# from src.agent import create_agent
 from argparse import ArgumentParser
 
 
@@ -102,10 +102,27 @@ if __name__ == "__main__":
     parser.add_argument("--n", "--num_iter", type=int, default=3)
     parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
     parser.add_argument("--num_ailments", type=int, default=5, choices=[3, 5, 7])
+    parser.add_argument("--mode", type=str, default="alphabetical", choices=["random", "ascending", "descending", "alphabetical"])
     args = parser.parse_args()
 
-    data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
+    if args.task == "RAD":
+        if args.mode == "random":
+            data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
+            data = data.sample(frac=1).reset_index(drop=True)
+
+        elif args.mode == "ascending":
+            data = pd.read_csv(f"data/xray_data_{args.num_ailments}_asc.csv", index_col=None)
+
+        elif args.mode == "descending":
+            data = pd.read_csv(f"data/xray_data_{args.num_ailments}_asc.csv", index_col=None)
+            data = data[::-1].reset_index(drop=True) 
+
+        elif args.mode == "alphabetical":
+            data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
+        
+
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
+    print(data)
     iterdata = data.iterrows()
     D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
