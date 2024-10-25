@@ -155,9 +155,9 @@ class RAD(Task):
         messages = [
             {
                 "role": "system",
-                "content": """You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-                It is also known that the user has access to an oracle with 100% prediction accuracy, so you can trust their predictions.
-                Adhere to the following output format strictly, no extra text:
+                "content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+                It is known that the user's predictions are always correct, i.e., ground truth.
+                You have to strictly response in, no extra text:
                 *Prediction: Yes/No*
                 *Explanation: <Your explanation here>*
                 """
@@ -183,9 +183,8 @@ class RAD(Task):
         if c_j is None:
             return messages
         else:
-            copied_c_j = deepcopy(c_j)
-            copied_c_j += messages
-            return copied_c_j
+            c_j += messages
+            return c_j
 
     @staticmethod
     def match(y, pred) -> bool:
@@ -220,15 +219,16 @@ class RAD(Task):
         """
         # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
         completion = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             temperature=0.0,
+            seed=42,
             messages=[
                 {
                     "role": "system",
                     "content": """
                     You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
                     Your task is to check consistency between two given diagnoses/explanations of an XRay.
-                    1. Ignore any patient information mentioned in either diagnosis/explanation.
+                    1. Ignore any personal patient information mentioned in either diagnosis/explanation, e.g. age, name, etc.
                     2. Consider consistency in terms of the symptoms only and not the causes, e.g. if a report mentions xyz can be
                     diagnosed from follow-up and another report just mentions xyz, then this is no problem, it's not necessary to mention follow-up.
                     3. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.

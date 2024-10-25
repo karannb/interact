@@ -167,9 +167,36 @@ class RADAgent(Agent):
             List[Dict]: new context
         """
         _, img, _ = x
-        if j == 1 or j == 2:
+        if j == 1:
             # first messages are just information about the models
             C[-1]["content"] = "This is my initial opinion on the X-Ray: " + C[-1]["content"]
+        elif j == 2:
+            # need to handle human's first response specially.
+            if l_hat == "ratify":
+                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                encoded_img = encode_image(img)
+                new_content = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "This is the image for further reference."
+                            },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encoded_img}"
+                            }
+                        }
+                    ]
+                }
+                C.append(new_content)
+            elif l_hat == "reject":
+                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
+            elif l_hat == "revise":
+                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+            elif l_hat == "refute":
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
@@ -193,12 +220,17 @@ class RADAgent(Agent):
                     }
                     C.append(new_content)
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I will revise my opinion. " + C[-1]["content"]
+                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
                 # because nothing changes, we send the same opinion again as 2 steps ago
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-3]["content"]
+                if "I think you made a mistake" in C[-3]["content"]:
+                    # if we had refuted two steps ago, we need to send the same opinion again
+                    # without the refutation added again
+                    C[-1]["content"] = C[-3]["content"]
+                else:
+                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-3]["content"]
 
         return C
 
@@ -224,7 +256,7 @@ class RADMachine(RADAgent):
     def __init__(self, id: int):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o-mini",
+                           model="gpt-4o",
                            max_tokens=300)
 
     def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
@@ -241,7 +273,8 @@ class RADMachine(RADAgent):
 
         # assemble prompt and ask LLM
         P_j = self.assemble_prompt(x, C)
-        response = self.llm(messages=P_j)
+        response = self.llm(messages=P_j,
+                            seed=42)
         try:
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
@@ -375,7 +408,8 @@ class DRUGMachine(DRUGAgent):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
                            model="gpt-o1-preview",
-                           max_tokens=300)
+                           max_tokens=300,
+                           seed=42)
 
     def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
         """
