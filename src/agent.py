@@ -12,7 +12,7 @@ openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
     organization=openai_org,
     project=openai_project,
-    api_key=openai_key
+    api_key=openai_key,
 )
 
 
@@ -256,7 +256,7 @@ class RADMachine(RADAgent):
     def __init__(self, id: int):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o",
+                           model="gpt-4o-mini",
                            max_tokens=300)
 
     def ask(self, x: Tuple, C: List[Dict]) -> Tuple:

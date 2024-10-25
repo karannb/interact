@@ -11,7 +11,7 @@ openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
     organization=openai_org,
     project=openai_project,
-    api_key=openai_key
+    api_key=openai_key,
 )
 
 import base64
@@ -219,7 +219,7 @@ class RAD(Task):
         """
         # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
         completion = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             temperature=0.0,
             seed=42,
             messages=[

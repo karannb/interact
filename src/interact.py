@@ -44,8 +44,10 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
     # Iterate over all input data
     for idx, x in data:
         # Generate a random session identifier and store the input data
+
         sess = uuid.uuid4().hex[:4]
         total_sessions += 1
+        print(total_sessions)
         label, _, _ = x
         D.append((x, sess))
 
@@ -107,8 +109,7 @@ if __name__ == "__main__":
 
     if args.task == "RAD":
         if args.mode == "random":
-            data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
-            data = data.sample(frac=1).reset_index(drop=True)
+            data = pd.read_csv(f"data/xray_data_{args.num_ailments}_rand.csv", index_col=None)
 
         elif args.mode == "ascending":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}_asc.csv", index_col=None)
@@ -122,9 +123,9 @@ if __name__ == "__main__":
         
 
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
-    print(data)
+    # print(data)
     iterdata = data.iterrows()
-    D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
+    # D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
         os.makedirs("results")
