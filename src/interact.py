@@ -125,7 +125,7 @@ if __name__ == "__main__":
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
     # print(data)
     iterdata = data.iterrows()
-    # D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
+    D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
         os.makedirs("results")

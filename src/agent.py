@@ -229,6 +229,8 @@ class RADAgent(Agent):
                     # if we had refuted two steps ago, we need to send the same opinion again
                     # without the refutation added again
                     C[-1]["content"] = C[-3]["content"]
+                elif isinstance(C[-3]["content"], list):
+                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
                 else:
                     C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-3]["content"]
 
