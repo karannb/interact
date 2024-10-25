@@ -41,6 +41,7 @@ Here, we precisely describe how to use the code for a different task, say MATS (
 - If it is static then you would need to add the data to the `data/` folder.
 - Now, depeding on the type of feedback, you should implement a `MATSAgent` class in `src/agents.py` which should inherit from `Agent`, and borrow code from `RADAgent` (if static) and `DRUGAgent` (if real-time).
 - Following this, implement `MATSMachine` and `MATSHuman` classes in the same file.
+- With this, you need to change the `create_agent` in `src/agent.py` to also be compatible with the new task.
 - Finally, you have to implement the `MATS` class in `src/utils.py` which should inherit from `Task` and borrow code from `RAD` and `DRUG` appropriately.
 - Now, you can run the code using the following command: (add this task to the choices for the `--task` argument)
 ```bash
