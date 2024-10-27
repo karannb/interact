@@ -57,7 +57,7 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
         human_ratified, machine_ratified = False, False
         while not done:
             # ask the machine
-            mu_m, C = machine.call(j, k, (D, M, C)) # (tag, pred, expl) and context
+            mu_m, C = machine(j, k, (D, M, C)) # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
             if mu_m[0] == "revise":
@@ -69,7 +69,7 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
 
             if not done:
                 # ask the human
-                mu_h, C = human.call(j, k, (D, M, C)) # (tag, pred, expl) and context
+                mu_h, C = human(j, k, (D, M, C)) # (tag, pred, expl) and context
                 M += [(sess, j, h, mu_h, m)]
                 j += 1
                 human_ratified = (mu_h[0] == "ratify")

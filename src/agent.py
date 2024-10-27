@@ -29,7 +29,7 @@ class Agent:
         self.match = None
         self.agree = None
 
-    def call(self, j: int, k: int, delta: Tuple) -> Tuple:
+    def __call__(self, j: int, k: int, delta: Tuple) -> Tuple:
         """
         Call the agent for a response.
 
