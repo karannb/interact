@@ -15,6 +15,12 @@ pip install -r requirements.txt
 You might want to create a virtual environment (or use conda) to avoid conflicts with your system packages.
 We use **python3.9.18** for all experiments.
 
+### Data
+For the RAD task, please write to Prof. Sidong Liu [email](mailto:sidong.liu@mq.edu.au).
+For the DRUG task, please write to Shreyas V [email](mailto:shreyas.college@gmail.com).
+You can then use `src/preprocess.py` to generate the data in the correct format, for the experiments.
+This will also summarize the data, using the `summarize` function from `src/utils.py`.
+
 ### Reproducing our results
 To reproduce our RAD results, you can run the following command:
 ```bash
@@ -26,14 +32,11 @@ Reproducing the DRUG results requires an expert and so the outcome may be stocha
 
 ![Figure](assets/trend.png)
 
-### Data
-We provide our own dataset consisting of Xrays, over 5 ailments.
-It consists of static reports which are summaries of actual ground truth human reports which can be extracted from the links provided (we used the `summarize` function from `src/utils.py` to generate these summaries).
-In general the code allows for interaction between such static human feedback and an LLM (interfaced by the machine).
-So, for the model to work with custom data, you would need some form of static human feedback, stored in data as a CSV.
-
-### Real-time feedback
-With the DRUG task, one can create an analogous real-time feedback system, using the command line and a real expert human for feedback.
+### Static / Real-time feedback
+In general the code allows for interaction between both static and real-time human feedback and an LLM (interfaced by the `XMachine`).
+To use the approach with custom data, 
+- you can use some form of static human feedback (like RAD), stored in data as a CSV,
+- as with the DRUG task, one can create an analogous real-time feedback system, using the command line and a real expert human for feedback.
 
 ### How to use the code for a different task
 Here, we precisely describe how to use the code for a different task, say MATS (i.e. Materials Science).
@@ -47,7 +50,6 @@ Here, we precisely describe how to use the code for a different task, say MATS (
 ```bash
 python src/interact.py --num_iter=5 --task=MATS
 ```
-
 
 ### Citation
 If you find this code useful, please consider citing our preprint:

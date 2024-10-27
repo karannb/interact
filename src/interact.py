@@ -110,14 +110,11 @@ if __name__ == "__main__":
     if args.task == "RAD":
         if args.mode == "random":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}_rand.csv", index_col=None)
-
         elif args.mode == "ascending":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}_asc.csv", index_col=None)
-
         elif args.mode == "descending":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}_asc.csv", index_col=None)
             data = data[::-1].reset_index(drop=True) 
-
         elif args.mode == "alphabetical":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
         
