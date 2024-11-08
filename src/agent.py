@@ -190,7 +190,7 @@ class RADAgent(Agent):
                         }
                     ]
                 }
-                C.append(new_content)
+                # C.append(new_content)
             elif l_hat == "reject":
                 C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
@@ -218,7 +218,7 @@ class RADAgent(Agent):
                             }
                         ]
                     }
-                    C.append(new_content)
+                    # C.append(new_content)
             elif l_hat == "reject":
                 C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
@@ -377,7 +377,7 @@ class DRUGAgent(Agent):
                             }
                         ]
                     }
-                    C.append(new_content)
+                    # C.append(new_content)
             elif l_hat == "reject":
                 C[-1]["content"] = "I disagree with you and reject your opinion. " + C[-1]["content"]
             elif l_hat == "revise":
