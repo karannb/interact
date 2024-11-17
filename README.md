@@ -40,7 +40,7 @@ Here, we precisely describe how to use the code for a different task, say MATS (
 - Now, depeding on the type of feedback, you should implement a `MATSAgent` class in `src/agents.py` which should inherit from `Agent`, and borrow code from `RADAgent` (if static) and `DRUGAgent` (if real-time).
 - Following this, implement `MATSMachine` and `MATSHuman` classes in the same file.
 - With this, you need to change the `create_agent` in `src/agent.py` to also be compatible with the new task.
-- Finally, you have to implement the `MATS` class in `src/utils.py` which should inherit from `Task` and borrow code from `RAD` and `DRUG` appropriately.
+- Finally, you have to implement the `MATS` class in `src/tasks.py` which should inherit from `Task` and borrow code from `RAD` and `DRUG` appropriately.
 - Now, you can run the code using the following command: (add this task to the choices for the `--task` argument)
 ```bash
 python src/interact.py --num_iter=5 --task=MATS

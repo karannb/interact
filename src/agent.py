@@ -1,19 +1,20 @@
 from copy import deepcopy
 from functools import partial
 from abc import abstractmethod
-from typing import Tuple, List, Dict
-from src.utils import RAD, DRUG, encode_image
+
+from tasks import RAD, DRUG
+from utils import encode_image
 
 import os
 from openai import OpenAI
 openai_org = os.getenv("OPENAI_ORG")
-openai_project = os.getenv("OPENAI_PROJECT")
 openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
     organization=openai_org,
-    project=openai_project,
     api_key=openai_key,
 )
+
+from typing import Tuple, List, Dict
 
 
 class Agent:

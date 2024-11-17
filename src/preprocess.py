@@ -1,7 +1,7 @@
 import os
 import shutil
 import pandas as pd
-from src.utils import summarize
+from utils import summarize
 
 def preprocess():
     """
