@@ -6,16 +6,19 @@ import uuid
 import pickle
 import pandas as pd
 from typing import List
+from utils import evaluate
+from tasks import RAD, DRUG
 from agent import create_agent
 from argparse import ArgumentParser
 
 
-def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
+def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
     """
     Core interact function between the human and the machine.
 
     Args:
-        data : Input Data instances, a list of data.
+        data : Input Data instances, a list of data
+        test_data: Test data for evaluation
         h (int): human-identifier
         m (int): machine-identifier
         n (int): upper bound on interactions
@@ -34,6 +37,7 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
     assert task in ["RAD", "DRUG"], "Invalid task, expected 'RAD' or 'DRUG', got " + task
     human = create_agent(task, "Human", h)
     machine = create_agent(task, "Machine", m)
+    agree_fn = RAD.agree if task == "RAD" else DRUG.agree
 
     # metrics
     total_sessions = 0
@@ -62,7 +66,9 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
             j += 1
             if mu_m[0] == "revise":
                 l_m_revision = True
-            machine_ratified = (mu_m[0] == "ratify")
+                if test_data is not None:
+                    evaluate(C, test_data, label, agree_fn)
+            machine_ratified = (mu_m[0] == "ratify") or machine_ratified
             # stopping condition
             done = (j > n) or (human_ratified and machine_ratified)
             tags.extend([f"Machine: {mu_m[0]}"])
@@ -72,7 +78,7 @@ def Interact(data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
                 mu_h, C = human(j, k, (D, M, C)) # (tag, pred, expl) and context
                 M += [(sess, j, h, mu_h, m)]
                 j += 1
-                human_ratified = (mu_h[0] == "ratify")
+                human_ratified = (mu_h[0] == "ratify") or human_ratified
                 # stopping condition
                 done = (j > n) or (human_ratified and machine_ratified) or (mu_h[0] == "reject")
                 tags.extend([f"Human: {mu_h[0]}"])
@@ -107,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="alphabetical", choices=["random", "ascending", "descending", "alphabetical"])
     args = parser.parse_args()
 
-    if args.task == "RAD":
+    if args.task == "order-checks":
         if args.mode == "random":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}_rand.csv", index_col=None)
         elif args.mode == "ascending":
@@ -117,12 +123,21 @@ if __name__ == "__main__":
             data = data[::-1].reset_index(drop=True) 
         elif args.mode == "alphabetical":
             data = pd.read_csv(f"data/xray_data_{args.num_ailments}.csv", index_col=None)
+        args.task = "RAD"
+        test_data = None
+    elif args.task == "RAD":
+        data = pd.read_csv("data/train_xray_data.csv", index_col=None)
+        test_data = pd.read_csv("data/test_xray_data.csv", index_col=None)
+    elif args.task == "DRUG":
+        raise NotImplementedError("DRUG task is not implemented yet.")
+    else:
+        raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
         
 
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
-    # print(data)
+    test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
     iterdata = data.iterrows()
-    D, M, C = Interact(iterdata, task=args.task, h=1, m=2, n=args.n)
+    D, M, C = Interact(iterdata, test_data, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
         os.makedirs("results")

@@ -1,5 +1,7 @@
 import os
 import base64
+import pandas as pd
+from copy import deepcopy
 from openai import OpenAI
 
 
@@ -10,7 +12,7 @@ client = OpenAI(
     api_key=openai_key,
 )
 
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Callable
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
@@ -61,3 +63,106 @@ def summarize(report: str, ailment: str) -> str:
     summary = completion.choices[0].message.content
 
     return summary
+
+
+def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Callable) -> None:
+    """
+    Evaluates the model on the given test data.
+
+    Args:
+        context (Prompt): Current context for the model
+        test_df (pd.DataFrame): Test data
+        ailment (str): The ailment to evaluate the model for
+        agree_fn (Callable): Function to check if the explanation agrees with the prediction
+    """
+
+    # initialize the counters
+    total = 0
+    correct_preds = 0
+    correct_expls = 0
+
+    # prediction prompt
+    pred_prompt = deepcopy(context)
+    pred_prompt.append(
+        {
+            "role": "system",
+            "content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+            You have to strictly response in, no extra text:
+            *Prediction: Yes/No*
+            """
+        },
+        {
+            "role": "user",
+            "content": f"Given the following chest XRay, you have to predict the presence of {ailment}."
+        }
+    )
+
+    expl_prompt = deepcopy(context)
+    expl_prompt.append(
+        {
+            "role": "system",
+            "content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+            You have to strictly response in, no extra text:
+            *Explanation: <Your explanation here>*
+            """
+        },
+        {
+            "role": "user",
+            "content": f"Given the following chest XRay, you have to explain the presence of {ailment}."
+        }
+    )
+
+    # iterate over the test data
+    for _, row in test_df.iterrows():
+        total += 1
+        report = row["report"]
+        label = row["label"]
+        img = encode_image(row["img_path"])
+
+        # get prediction
+        img_msg = {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{img}"
+                    }
+                }
+            ]
+        }
+        prediction = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=pred_prompt + [img_msg]
+        )
+        prediction = prediction.choices[0].message.content
+
+        # if label != ailment, we don't care about explanation, only prediction
+        if label != ailment:
+            correct_preds += 1 if prediction.lower() == "no" else 0
+            correct_expls += 1 if prediction.lower() == "no" else 0
+        else:
+            if prediction.lower() == "no":
+                # the ailment IS present, but the model predicted it as absent
+                pass
+            else:
+                # get explanation
+                explanation = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=expl_prompt + [img_msg]
+                )
+                explanation = explanation.choices[0].message.content
+
+                # check if the prediction is correct
+                correct_preds += 1 if prediction.lower() == "yes" else 0
+                correct_expls += 1 if agree_fn(explanation, report) else 0
+
+    # print the results
+    print(f"Ailment: {ailment}")
+    print(f"Total: {total}")
+    print(f"Correct Predictions: {correct_preds}")
+    print(f"Correct Explanations: {correct_expls}")
+    print(f"Accuracy: {correct_preds / total}")
+    print(f"Explanation Accuracy: {correct_expls / total}")
+
+    return correct_preds, correct_expls, total
