@@ -101,15 +101,21 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
     expl_prompt = deepcopy(context)
     expl_prompt.append(
         {
+            # TODO: check prompt
             "role": "system",
             "content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
             You have to strictly response in, no extra text:
+            *Prediction: Yes*
             *Explanation: <Your explanation here>*
             """
         },
         {
             "role": "user",
             "content": f"Given the following chest XRay, you have to explain the presence of {ailment}."
+        },
+        {
+            "role": "assistant",
+            "content": "*Prediction: Yes*"
         }
     )
 
