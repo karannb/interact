@@ -41,7 +41,9 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
 
     # initial performance on the test data
     if test_data is not None:
-        evaluate_many(C, test_data, agree_fn)
+        evaluate_many([], test_data, machine, agree_fn)
+
+    import pdb; pdb.set_trace()
 
     # metrics
     total_sessions = 0
@@ -55,7 +57,6 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
 
         sess = uuid.uuid4().hex[:4]
         total_sessions += 1
-        print(total_sessions)
         label, _, _ = x
         D.append((x, sess))
 
@@ -71,7 +72,7 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
             if mu_m[0] == "revise":
                 l_m_revision = True
                 if test_data is not None:
-                    evaluate(C, test_data, label, agree_fn)
+                    evaluate(C, test_data, label, machine, agree_fn)
             machine_ratified = (mu_m[0] == "ratify") or machine_ratified
             # stopping condition
             done = (j > n) or (human_ratified and machine_ratified)

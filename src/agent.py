@@ -104,7 +104,7 @@ class Agent:
         C = self.update_context(C, x, l_hat, j)
 
         return (l_hat, y_hat, e_hat), C
-    
+
     @abstractmethod
     def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
         """
@@ -122,13 +122,14 @@ class Agent:
         raise NotImplementedError("Subclass must implement abstract method.")
 
     @abstractmethod
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the agent for a response.
 
         Args:
             x (Tuple): example of (y, img, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
 
         Returns:
             Tuple: prediction and explanation
@@ -238,13 +239,14 @@ class RADAgent(Agent):
         return C
 
     @abstractmethod
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the agent for a response.
 
         Args:
             x (Tuple): example of (y, img, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
 
         Returns:
             Tuple: prediction and explanation
@@ -260,22 +262,27 @@ class RADMachine(RADAgent):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
                            model="gpt-4o-mini",
-                           max_tokens=300)
+                           max_tokens=300,
+                           seed=42)
 
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the machine for a response.
         
         Args:
             x (Tuple): example of (y, img, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
 
         Returns:
             Tuple: prediction, explanation and updated context
         """
 
         # assemble prompt and ask LLM
-        P_j = self.assemble_prompt(x, C)
+        if is_prompt:
+            P_j = C
+        else:
+            P_j = self.assemble_prompt(x, C)
         response = self.llm(messages=P_j,
                             seed=42)
         try:
@@ -286,7 +293,8 @@ class RADMachine(RADAgent):
             return "problem", -1, C
 
         # update context if the response is valid
-        C = new_C
+        if not is_prompt:
+            C = new_C
 
         return y_m, e_m, C
 
@@ -298,13 +306,14 @@ class RADHuman(RADAgent):
     def __init__(self, id: int):
         super().__init__("Human", id)
 
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the human for a response.
 
         Args:
             x (Tuple): example of (y, img, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
 
         Returns:
             Tuple: prediction, explanation and updated context
@@ -315,7 +324,8 @@ class RADHuman(RADAgent):
         # add the human's response to the context
         human_response = {
             "role": "user",
-            "content": f"""*Prediction: Yes*
+            "content": f"""
+            *Prediction: Yes*
             *Explanation: {e}*"""
         }
         C.append(human_response)
@@ -389,13 +399,14 @@ class DRUGAgent(Agent):
         return C
 
     @abstractmethod
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the agent for a response.
 
         Args:
             x (Tuple): example of (y, mol, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
 
         Returns:
             Tuple: prediction and explanation
@@ -414,13 +425,15 @@ class DRUGMachine(DRUGAgent):
                            max_tokens=300,
                            seed=42)
 
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask the machine for a response.
 
         Args:
             x (Tuple): example of (y, mol, e)
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
+            TODO: use 
 
         Returns:
             Tuple: prediction, explanation and updated context
@@ -448,7 +461,7 @@ class DRUGHuman(DRUGAgent):
     def __init__(self, id: int):
         super().__init__("Human", id)
 
-    def ask(self, x: Tuple, C: List[Dict]) -> Tuple:
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
         Ask a Human for a response on the Command Line.
 
@@ -457,6 +470,7 @@ class DRUGHuman(DRUGAgent):
         Args:
             x (Tuple): (y, mol) tuple.
             C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or
 
         Returns:
             Tuple: prediction, explanation and updated context

@@ -38,6 +38,7 @@ def summarize(report: str, ailment: str) -> str:
     # NOTE: for this task, 3.5 is just as good as any advanced model
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
+        seed=42,
         messages=[
             {
                 "role": "system", 
@@ -65,7 +66,7 @@ def summarize(report: str, ailment: str) -> str:
     return summary
 
 
-def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Callable) -> None:
+def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agree_fn: Callable) -> None:
     """
     Evaluates the model on the given test data.
 
@@ -73,8 +74,10 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
         context (Prompt): Current context for the model
         test_df (pd.DataFrame): Test data
         ailment (str): The ailment to evaluate the model for
+        machine (Agent): The machine agent
         agree_fn (Callable): Function to check if the explanation agrees with the prediction
     """
+    print(f"Evaluating for {ailment}...")
 
     # initialize the counters
     total = 0
@@ -84,7 +87,7 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
 
     # prediction prompt
     pred_prompt = deepcopy(context)
-    pred_prompt.append(
+    pred_prompt.extend([
         {
             "role": "system",
             "content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
@@ -96,10 +99,11 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
             "role": "user",
             "content": f"Given the following chest XRay, you have to predict the presence of {ailment}."
         }
+    ]
     )
 
     expl_prompt = deepcopy(context)
-    expl_prompt.append(
+    expl_prompt.extend([
         {
             # TODO: check prompt
             "role": "system",
@@ -117,6 +121,7 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
             "role": "assistant",
             "content": "*Prediction: Yes*"
         }
+    ]
     )
 
     # iterate over the test data
@@ -138,32 +143,34 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
                 }
             ]
         }
-        prediction = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=pred_prompt + [img_msg]
-        )
-        prediction = prediction.choices[0].message.content
+        y = "problem"
+        while y == "problem":
+            y, _, _ = machine.ask(None, pred_prompt + [img_msg], is_prompt=True)
+            if y == "problem":
+                print("Problem with prediction, retrying...")
+
+        prediction = y
 
         # if label != ailment, we don't care about explanation, only prediction
         if label != ailment:
-            matchOK = prediction.lower() == "no"
+            matchOK = "no" in prediction.lower()
             correct_preds += 1 if matchOK else 0
             correct_expls += 1 if matchOK else 0
             correct += 1 if matchOK else 0
         else:
-            if prediction.lower() == "no":
+            if "no" in prediction.lower():
                 # the ailment IS present, but the model predicted it as absent
                 pass
             else:
                 # get explanation
-                explanation = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=expl_prompt + [img_msg]
-                )
-                explanation = explanation.choices[0].message.content
+                y = "problem"
+                while y == "problem":
+                    y, explanation, _ = machine.ask(None, expl_prompt + [img_msg], is_prompt=True)
+                    if y == "problem":
+                        print("Problem with explanation, retrying...")
 
                 # check if the prediction is correct
-                matchOK = prediction.lower() == "yes"
+                matchOK = "yes" in prediction.lower()
                 agreeOK = agree_fn(explanation, report)
                 correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
                 correct_expls += 1 if agreeOK else 0
@@ -182,17 +189,20 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
     return
 
 
-def evaluate_many(context: Prompt, test_data: Dict[str, pd.DataFrame], agree_fn: Callable) -> None:
+def evaluate_many(context: Prompt, test_data, machine, agree_fn: Callable) -> None:
     """
     Evaluates the model on multiple test data.
 
     Args:
         context (Prompt): Current context for the model
-        test_data (Dict[str, pd.DataFrame]): Test data for multiple ailments
+        test_data: Overall test data
+        machine (Agent): The machine agent
         agree_fn (Callable): Function to check if the explanation agrees with the prediction
     """
 
-    for ailment, test_df in test_data.items():
-        evaluate(context, test_df, ailment, agree_fn)
+    ailments = ["Atelectasis", "Pneumonia", "Pleural Effusion", "Cardiomegaly", "Pneumothorax"]
+
+    for ailment in ailments:
+        evaluate(context, test_data, ailment, machine, agree_fn)
 
     return
