@@ -6,10 +6,10 @@ import uuid
 import pickle
 import pandas as pd
 from typing import List
-from utils import evaluate
 from tasks import RAD, DRUG
 from agent import create_agent
 from argparse import ArgumentParser
+from utils import evaluate, evaluate_many
 
 
 def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
@@ -38,6 +38,10 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
     human = create_agent(task, "Human", h)
     machine = create_agent(task, "Machine", m)
     agree_fn = RAD.agree if task == "RAD" else DRUG.agree
+
+    # initial performance on the test data
+    if test_data is not None:
+        evaluate_many(C, test_data, agree_fn)
 
     # metrics
     total_sessions = 0

@@ -80,6 +80,7 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
     total = 0
     correct_preds = 0
     correct_expls = 0
+    correct = 0
 
     # prediction prompt
     pred_prompt = deepcopy(context)
@@ -139,8 +140,10 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
 
         # if label != ailment, we don't care about explanation, only prediction
         if label != ailment:
-            correct_preds += 1 if prediction.lower() == "no" else 0
-            correct_expls += 1 if prediction.lower() == "no" else 0
+            matchOK = prediction.lower() == "no"
+            correct_preds += 1 if matchOK else 0
+            correct_expls += 1 if matchOK else 0
+            correct += 1 if matchOK else 0
         else:
             if prediction.lower() == "no":
                 # the ailment IS present, but the model predicted it as absent
@@ -154,15 +157,36 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, agree_fn: Cal
                 explanation = explanation.choices[0].message.content
 
                 # check if the prediction is correct
-                correct_preds += 1 if prediction.lower() == "yes" else 0
-                correct_expls += 1 if agree_fn(explanation, report) else 0
+                matchOK = prediction.lower() == "yes"
+                agreeOK = agree_fn(explanation, report)
+                correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
+                correct_expls += 1 if agreeOK else 0
+                correct += 1 if matchOK and agreeOK else 0
 
     # print the results
     print(f"Ailment: {ailment}")
     print(f"Total: {total}")
     print(f"Correct Predictions: {correct_preds}")
     print(f"Correct Explanations: {correct_expls}")
-    print(f"Accuracy: {correct_preds / total}")
-    print(f"Explanation Accuracy: {correct_expls / total}")
+    print(f"Correct Overall: {correct}")
+    print(f"Prediction Accuracy: {100*correct_preds / total:.2f}")
+    print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
+    print(f"Overall Accuracy: {100*correct / total:.2f}")
 
-    return correct_preds, correct_expls, total
+    return
+
+
+def evaluate_many(context: Prompt, test_data: Dict[str, pd.DataFrame], agree_fn: Callable) -> None:
+    """
+    Evaluates the model on multiple test data.
+
+    Args:
+        context (Prompt): Current context for the model
+        test_data (Dict[str, pd.DataFrame]): Test data for multiple ailments
+        agree_fn (Callable): Function to check if the explanation agrees with the prediction
+    """
+
+    for ailment, test_df in test_data.items():
+        evaluate(context, test_df, ailment, agree_fn)
+
+    return
