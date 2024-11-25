@@ -66,7 +66,7 @@ def summarize(report: str, ailment: str) -> str:
     return summary
 
 
-def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agree_fn: Callable) -> None:
+def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agree_fn: Callable) -> float:
     """
     Evaluates the model on the given test data.
 
@@ -76,6 +76,9 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agre
         ailment (str): The ailment to evaluate the model for
         machine (Agent): The machine agent
         agree_fn (Callable): Function to check if the explanation agrees with the prediction
+
+    Returns:
+        float: The overall accuracy of the model
     """
     print(f"Evaluating for {ailment}...")
 
@@ -186,7 +189,7 @@ def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agre
     print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
     print(f"Overall Accuracy: {100*correct / total:.2f}")
 
-    return
+    return correct / total
 
 
 def evaluate_many(context: Prompt, test_data, machine, agree_fn: Callable) -> None:

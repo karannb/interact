@@ -1,8 +1,9 @@
 import os
+import pandas as pd
 from openai import OpenAI
 from abc import abstractmethod
-from utils import encode_image
-from typing import Tuple, List, Union, Dict, Optional
+from utils import encode_image, evaluate
+from typing import Tuple, List, Union, Dict, Optional, Callable
 
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
@@ -33,6 +34,13 @@ class Task:
 
         Returns:
             Prompt: prompt
+        """
+        raise NotImplementedError("Subclass must implement abstract method.")
+
+    @abstractmethod
+    def learn(C, ailment, machine, agree_fn):
+        """
+        Learn the task.
         """
         raise NotImplementedError("Subclass must implement abstract method.")
 
@@ -134,6 +142,30 @@ class RAD(Task):
 
         c_j += messages
         return c_j
+
+    @staticmethod
+    def learn(C: List, ailment: str, machine, agree_fn: Callable) -> bool:
+        """
+        Learn the task.
+        
+        Args:
+            C (List): context
+            ailment (str): ailment
+            machine (Agent): machine
+            agree_fn (function): agree_fn
+
+        Returns:
+
+        """
+        val_data = f"data/val/{ailment}.csv"
+        val_data = pd.read_csv(val_data).drop(columns=["case", "label_short", "link"], inplace=False)
+        new_performance = evaluate(C, val_data, ailment, machine, agree_fn)
+        # return true if the performance is improved
+        if machine.performance <= new_performance:
+            machine.performance = new_performance
+            return True
+        else:
+            return False
 
     @staticmethod
     def match(y, pred) -> bool:
@@ -251,6 +283,10 @@ class DRUG(Task):
 
     @staticmethod
     def assemble_prompt(x, c_j) -> Prompt:
+        pass
+
+    @staticmethod
+    def learn(C, ailment, machine, agree_fn) -> bool:
         pass
 
     @staticmethod

@@ -25,6 +25,7 @@ class Agent:
     def __init__(self, type: str, id: int):
         self.type = type
         self.id = id
+        self.performance = -1.0
 
         # these are set in the subclasses
         self.match = None
@@ -168,7 +169,6 @@ class RADAgent(Agent):
         Returns:
             List[Dict]: new context
         """
-        _, img, _ = x
         if j == 1:
             # first messages are just information about the models
             C[-1]["content"] = "This is my initial opinion on the X-Ray: " + C[-1]["content"]
@@ -176,23 +176,6 @@ class RADAgent(Agent):
             # need to handle human's first response specially.
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
-                encoded_img = encode_image(img)
-                new_content = {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "This is the image for further reference."
-                            },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{encoded_img}"
-                            }
-                        }
-                    ]
-                }
-                # C.append(new_content)
             elif l_hat == "reject":
                 C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
@@ -202,25 +185,6 @@ class RADAgent(Agent):
         else:
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
-                # now for ratify, we need to add the image (if it has not been added before)
-                if not isinstance(C[-2]["content"], list):
-                    encoded_img = encode_image(img)
-                    new_content = {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "This is the image for further reference."
-                                },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{encoded_img}"
-                                }
-                            }
-                        ]
-                    }
-                    # C.append(new_content)
             elif l_hat == "reject":
                 C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
@@ -283,8 +247,7 @@ class RADMachine(RADAgent):
             P_j = C
         else:
             P_j = self.assemble_prompt(x, C)
-        response = self.llm(messages=P_j,
-                            seed=42)
+        response = self.llm(messages=P_j)
         try:
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
