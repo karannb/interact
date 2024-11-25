@@ -43,8 +43,6 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
     if test_data is not None:
         evaluate_many([], test_data, machine, agree_fn)
 
-    import pdb; pdb.set_trace()
-
     # metrics
     total_sessions = 0
     one_way_human, one_way_machine = 0, 0

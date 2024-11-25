@@ -1,7 +1,4 @@
 import os
-import time
-import random
-import string
 from openai import OpenAI
 from abc import abstractmethod
 from utils import encode_image
@@ -15,20 +12,6 @@ client = OpenAI(
     organization=openai_org,
     api_key=openai_key,
 )
-
-
-SYS = [
-    {
-        "role": "system",
-        "content": """
-        Pretend that you are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-        It is also known that the user's predictions are always correct, i.e., ground truth.
-        You have to strictly adhere to the following format in your response, no extra text:
-        *Prediction: Yes/No*
-        *Explanation: <Your explanation here>*
-        """
-        }
-]
 
 
 class Task:
@@ -119,6 +102,16 @@ class RAD(Task):
         encoded_img = encode_image(img)
         messages = [
             {
+                "role": "system",
+                "content": """
+                Pretend that you are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+                It is also known that the user's predictions are always correct, i.e., ground truth.
+                You have to strictly adhere to the following format in your response, no extra text:
+                *Prediction: Yes/No*
+                *Explanation: <Your explanation here>*
+                """
+            },
+            {
                 "role": "user",
                 "content": f"""
                 Given the following chest XRay, you have to predict the presence of {y}.
@@ -139,9 +132,7 @@ class RAD(Task):
         if c_j is None:
             c_j = []
 
-        # id_ig = f"{time.time()}_{''.join(random.choices(string.ascii_letters + string.digits, k=8))}"
-        c_j += SYS + messages
-        # c_j = SYS[0]["content"].format(id_ig=id_ig) + c_j
+        c_j += messages
         return c_j
 
     @staticmethod
