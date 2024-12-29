@@ -3,6 +3,8 @@ import base64
 import pandas as pd
 from copy import deepcopy
 from openai import OpenAI
+from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
 
 
 openai_org = os.getenv("OPENAI_ORG")
@@ -209,3 +211,56 @@ def evaluate_many(context: Prompt, test_data, machine, agree_fn: Callable) -> No
         evaluate(context, test_data, ailment, machine, agree_fn)
 
     return
+
+def are_molecules_same(smiles1: str, smiles2: str) -> bool:
+    """Function to check if two molecules are the same.
+
+    Parameters
+    ----------
+    smiles1 : str
+        SMILES string for molecule 1
+    smiles2 : str
+        SMILES string for molecule 2
+
+    Returns
+    -------
+    bool
+        True if the molecules are the same, False otherwise
+
+    Raises
+    ------
+    ValueError
+        If invalid SMILES strings are provided
+    """
+    try:
+        mol1 = Chem.MolFromSmiles(smiles1)
+    except Exception as e:
+        mol1 = None
+    
+    try:
+        mol2 = Chem.MolFromSmiles(smiles2)
+    except Exception as e:
+        mol2 = None
+
+    if mol1 is None or mol2 is None:
+        raise ValueError("Invalid SMILES string provided.")
+
+    # Get canonical SMILES for both molecules
+    canonical_smiles1 = Chem.MolToSmiles(mol1, canonical=True)
+    canonical_smiles2 = Chem.MolToSmiles(mol2, canonical=True)
+
+    # Alternatively, compare molecular fingerprints
+    fingerprint1 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol1,
+                                                                  radius=2,
+                                                                  nBits=1024)
+    fingerprint2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2,
+                                                                  radius=2,
+                                                                  nBits=1024)
+
+    # Check if canonical SMILES or fingerprints match
+    if canonical_smiles1 == canonical_smiles2:
+        return True
+    elif fingerprint1 == fingerprint2:
+        return True
+    else:
+        return False

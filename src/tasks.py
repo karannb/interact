@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from openai import OpenAI
 from abc import abstractmethod
-from utils import encode_image, evaluate
+from utils import encode_image, evaluate, are_molecules_same
 from typing import Tuple, List, Union, Dict, Optional, Callable
 
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
@@ -283,7 +283,40 @@ class DRUG(Task):
 
     @staticmethod
     def assemble_prompt(x, c_j) -> Prompt:
-        pass
+        """
+        Assemble prompt for the LLM.
+
+        Args:
+            x: example
+            c_j: context
+
+        Returns:
+            Prompt: prompt
+        """
+        smiles, _, _ = x
+        messages = [
+            {
+                "role": "system",
+                "content": """
+                Pretend that you are a helpful retrosynthesis expert, with detailed knowledge of all known retrosynthesis procedures.
+                It is also known that the user's predictions are always correct, i.e., ground truth.
+                You have to strictly adhere to the following format in your response, no extra text:
+                *Prediction: <smiles of retrosynthesis product>*
+                *Explanation: <Your explanation here>*
+                """
+            },
+            {
+                "role": "user",
+                "content": f"""
+                You have to predict the single step retrosynthesis of {smiles}.
+                """
+            }
+        ]
+        if c_j is None:
+            c_j = []
+
+        c_j += messages
+        return c_j
 
     @staticmethod
     def learn(C, ailment, machine, agree_fn) -> bool:
@@ -291,12 +324,102 @@ class DRUG(Task):
 
     @staticmethod
     def match(y, pred) -> bool:
-        pass
+        """
+        Match the prediction with the example.
+
+        Args:
+            y: ground truth
+            pred: prediction
+
+        Returns:
+            bool: True if the prediction matches the example, False otherwise
+        """
+        res = are_molecules_same(y, pred)
+        if res:
+            return True
+        else:
+            return False
 
     @staticmethod
     def agree(e, e_pred) -> bool:
-        pass
+        """
+        Check if the explanation agrees with the prediction.
+
+        Args:
+            e: explanation
+            e_pred: explanation
+
+        Returns:
+            bool: True if the explanation agrees with the prediction, False otherwise
+        """
+        # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            temperature=0.0,
+            seed=42,
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    You are a retrosynthesis expert, with detailed knowledge of all known retrosynthesis procedures.
+                    Your task is to check consistency between two given explanations of a retrosynthesis procedure.
+                    1. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.
+                    2. Respond only in Yes/No."""
+                },
+                {
+                    "role": "user",
+                    "content": f"Given A: {e} is an explanation of a retrosynthesis pathway, and B: {e_pred} is another explanation of a retrosynthesis pathway, are these two consistent?"
+                },
+            ]
+        )
+
+        # parse the response
+        out = completion.choices[0].message.content.lower()
+        if "yes" in out:
+            return True
+        else:
+            return False
 
     @staticmethod
     def parse_response(response, C: Optional[List]) -> Tuple:
-        pass
+        """
+        Parse the response from the LLM.
+
+        Args:
+            response (str): response from the LLM
+            C (List): context
+
+        Returns:
+            Tuple: prediction and explanation
+        """
+        response = response.choices[0].message.content
+        pred_and_expl = response.split("\n")
+        prediction, explanation = "", ""
+        for text in pred_and_expl:
+            if "Prediction" in text:
+                prediction = text
+            if "Explanation" in text:
+                explanation = text
+        assert prediction != "" or explanation != "", "Prediction or Explanation not found in the response."
+        if prediction != "":
+            assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis product>', got " + prediction
+            pred = prediction.split(":")[1].strip()
+        else:
+            pred = None
+        if explanation != "":
+            assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
+            expl = explanation.split(":")[1].strip()
+        else:
+            expl = None
+
+        # add to the context
+        response_conv = {
+            "role": "assistant",
+            "content": response
+        }
+        if C != None:
+            C.append(response_conv)
+        else:
+            C = [response_conv]
+
+        return pred, expl, C
