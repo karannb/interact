@@ -293,7 +293,7 @@ class DRUG(Task):
         Returns:
             Prompt: prompt
         """
-        smiles, _, _ = x
+        y, _, _ = x
         messages = [
             {
                 "role": "system",
@@ -308,7 +308,7 @@ class DRUG(Task):
             {
                 "role": "user",
                 "content": f"""
-                You have to predict the single step retrosynthesis of {smiles}.
+                You have to predict the single step retrosynthesis of {y}.
                 """
             }
         ]

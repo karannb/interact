@@ -330,34 +330,37 @@ class DRUGAgent(Agent):
         # get the molecule being discussed
         _, mol = x
 
-        if j == 1 or j == 2:
+        if j == 1:
             # first messages are just information about the models
             C[-1]["content"] = "This is the preliminary retrosynthesis pathway I propose: " + C[-1]["content"]
+        elif j == 2:
+            # need to handle human's first response specially.
+            if l_hat == "ratify":
+                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+            elif l_hat == "reject":
+                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this retrosynthesis pathway is: " + C[-1]["content"]
+            elif l_hat == "revise":
+                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+            elif l_hat == "refute":
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
         else:
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
-                # now for ratify, we need to add the molecule (if it has not been added before)
-                if not isinstance(C[-2]["content"], list):
-                    new_content = {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "This is the molecule for further reference."
-                                },
-                            {
-                                "type": "text",
-                                "text": mol
-                            }
-                        ]
-                    }
-                    # C.append(new_content)
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this retrosynthesis pathway is: " + C[-1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I will revise my opinion. " + C[-1]["content"]
+                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
+                # because nothing changes, we send the same opinion again as 2 steps ago
+                if "I think you made a mistake" in C[-3]["content"]:
+                    # if we had refuted two steps ago, we need to send the same opinion again
+                    # without the refutation added again
+                    C[-1]["content"] = C[-3]["content"]
+                elif isinstance(C[-3]["content"], list):
+                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
+                else:
+                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-3]["content"]
+                
 
         return C
 
@@ -396,13 +399,16 @@ class DRUGMachine(DRUGAgent):
             x (Tuple): example of (y, mol, e)
             C (List[Dict]): context
             is_prompt (bool): whether the C is a prompt or not
-            TODO: use 
 
         Returns:
             Tuple: prediction, explanation and updated context
         """
+
         # assemble prompt and ask LLM
-        P_j = self.assemble_prompt(x, C)
+        if is_prompt:
+            P_j = C
+        else:
+            P_j = self.assemble_prompt(x, C)
         response = self.llm(messages=P_j)
         try:
             copied_C = deepcopy(C)
@@ -412,7 +418,8 @@ class DRUGMachine(DRUGAgent):
             return "problem", -1, C
 
         # update context if the response is valid
-        C = new_C
+        if not is_prompt:
+            C = new_C
 
         return y_m, e_m, C
     
