@@ -41,9 +41,9 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
     agree_fn = RAD.agree if task == "RAD" else DRUG.agree
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
 
-    # # initial performance on the test data
-    # if test_data is not None:
-    #     evaluate([], test_data, "Atelectasis", machine, agree_fn)
+    # initial performance on the test data
+    if test_data is not None:
+        evaluate([], test_data, "Pneumothorax", machine, agree_fn)
 
     # metrics
     total_sessions = 0
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         test_data = None
     elif args.task == "RAD":
         data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
-        test_data = pd.read_csv("data/test_xray_data.csv", index_col=None)
+        test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
     elif args.task == "DRUG":
         raise NotImplementedError("DRUG task is not implemented yet.")
     else:
