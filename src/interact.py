@@ -144,10 +144,15 @@ if __name__ == "__main__":
         data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
         test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
     elif args.task == "DRUG":
-        raise NotImplementedError("DRUG task is not implemented yet.")
+        # DRUG task has a different separator (;)
+        data = pd.read_csv("data/retro.csv", sep=";", index_col=None)
+        # split the data into train, val and test
+        total = len(data)
+        train_data = data[:(total // 3)]
+        val_data = data[(total // 3):(2 * total // 3)]
+        test_data = data[(2 * total // 3):]
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
-        
 
     data = data.drop(columns=["case", "label_short", "link"], inplace=False)
     test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
