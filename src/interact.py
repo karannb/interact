@@ -130,18 +130,18 @@ if __name__ == "__main__":
 
     if args.task == "order-checks":
         if args.mode == "random":
-            data = pd.read_csv(f"data/xray_data_5_rand.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5_rand.csv", index_col=None)
         elif args.mode == "ascending":
-            data = pd.read_csv(f"data/xray_data_5_asc.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5_asc.csv", index_col=None)
         elif args.mode == "descending":
-            data = pd.read_csv(f"data/xray_data_5_asc.csv", index_col=None)
-            data = data[::-1].reset_index(drop=True) 
+            train_data = pd.read_csv(f"train_data/xray_data_5_asc.csv", index_col=None)
+            train_data = train_data[::-1].reset_index(drop=True) 
         elif args.mode == "alphabetical":
-            data = pd.read_csv(f"data/xray_data_5.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5.csv", index_col=None)
         args.task = "RAD"
         test_data = None
     elif args.task == "RAD":
-        data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
+        train_data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
         test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
     elif args.task == "DRUG":
         # DRUG task has a different separator (;)
@@ -154,9 +154,9 @@ if __name__ == "__main__":
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 
-    data = data.drop(columns=["case", "label_short", "link"], inplace=False)
+    train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
     test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
-    iterdata = data.iterrows()
+    iterdata = train_data.iterrows()
     D, M, C = Interact(iterdata, test_data, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
