@@ -3,7 +3,7 @@ import pandas as pd
 from openai import OpenAI
 from copy import deepcopy
 from abc import abstractmethod
-from utils import encode_image, are_molecules_same
+from utils import encode_image
 from typing import Tuple, List, Union, Dict, Optional, Callable
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
@@ -513,6 +513,7 @@ class DRUG(Task):
 			mol2 = None
 
 		if mol1 is None or mol2 is None:
+			return False ## FIX 
 			raise ValueError("Invalid SMILES string provided.")
 
 		# Get canonical SMILES for both molecules
@@ -690,8 +691,6 @@ class DRUG(Task):
 			correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0
-
-
 
 		# print the results
 		print(f"Molecule: {y}")

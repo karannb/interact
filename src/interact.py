@@ -38,7 +38,7 @@ def Interact(train_data, val_data, test_data, human_type, eval_at_start, task: s
 
 
     human = create_agent(task, "Human", human_type, h)
-    machine = create_agent(task, "Machine", m)
+    machine = create_agent(task, "Machine",human_type, m)
 
     agree_fn = RAD.agree if task == "RAD" else DRUG.agree
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
@@ -46,7 +46,7 @@ def Interact(train_data, val_data, test_data, human_type, eval_at_start, task: s
 
     # initial performance on the test data
     if eval_at_start:
-        if test_data is not None:
+        if test_data is not None and task == "RAD":
             evaluate_fn([], test_data, "Pneumothorax", machine, agree_fn)
 
     # metrics
@@ -96,11 +96,11 @@ def Interact(train_data, val_data, test_data, human_type, eval_at_start, task: s
             f.write(f"sessionID-{sess}, ailment-{label} ::: tags-{tags}\n")
 
         # decide if the context is helpful
-        if learn_fn(C_, label, machine, agree_fn):
+        if learn_fn(C_, val_data, machine):
             C = C_
 
         if (test_data is not None) and (l_m_revision):
-            evaluate_fn(C, test_data, label, machine, agree_fn)
+            evaluate_fn(C, test_data, machine)
         # only check for ratify because, in this special case,
         # human agent can never revise.
         l_h, l_m = mu_h[0], mu_m[0]
@@ -158,9 +158,10 @@ if __name__ == "__main__":
         data = pd.read_csv("data/retro.csv", sep=";", index_col=None)
         # split the data into train, val and test
         total = len(data)
-        train_data = data[:(total // 3)]
-        val_data = data[(total // 3):(2 * total // 3)]
-        test_data = data[(2 * total // 3):]
+        train_data = data[:int(total * 0.6)]
+        val_data = data[int(total * 0.6) : int(total * 0.8)]
+        test_data = data[int(total * 0.8):]
+
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 

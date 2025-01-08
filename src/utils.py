@@ -10,8 +10,8 @@ from rdkit.Chem import rdMolDescriptors
 openai_org = os.getenv("OPENAI_ORG")
 openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
-    organization=openai_org,
-    api_key=openai_key,
+	organization=openai_org,
+	api_key=openai_key,
 )
 
 from typing import List, Union, Dict, Callable

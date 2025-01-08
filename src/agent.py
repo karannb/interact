@@ -319,7 +319,7 @@ class DRUGAgent(Agent):
 
         Args:
             C (List[Dict]): Current context
-            x (Tuple): example of (y, mol)
+            x (Tuple): example of (y, mol, e)
             mu (Tuple): tuple of (l, y, e)
             j (int): interaction identifier
 
@@ -327,7 +327,8 @@ class DRUGAgent(Agent):
             List[Dict]: new context
         """
         # get the molecule being discussed
-        _, mol = x
+        
+        _, mol, _ = x
 
         if j == 1:
             # first messages are just information about the models
