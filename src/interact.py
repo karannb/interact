@@ -166,9 +166,9 @@ if __name__ == "__main__":
         data = data[["output", "input", "explanation"]] # x, y, e format
         # split the data into train, val and test
         total = len(data)
-        train_data = data[:int(total * 0.15)]
-        val_data = data[int(total * 0.6) : int(total * 0.7)]
-        test_data = data[int(total * 0.7) : int(total * 0.8)]
+        train_data = data[:int(total * 0.6)]
+        val_data = data[int(total * 0.6) : int(total * 0.8)]
+        test_data = data[int(total * 0.8) :]
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 

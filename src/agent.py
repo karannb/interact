@@ -25,6 +25,8 @@ class Agent:
         self.type = type
         self.id = id
         self.performance = -1.0
+        self.preds = -1.0
+        self.expls = -1.0
 
         # these are set in the subclasses
         self.match = None
@@ -415,7 +417,9 @@ class DRUGMachine(DRUGAgent):
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
         except AssertionError as e:
+            print()
             print(f"Problem {e} in response {response}, redoing...")
+            print()
             return "problem", -1, C
 
         # update context if the response is valid

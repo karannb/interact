@@ -461,6 +461,14 @@ class DRUG(Task):
 				You have to strictly adhere to the following format in your response, no extra text:
 				Prediction: <smiles of retrosynthesis input>
 				Pathway: <the retrosynthesis pathway described in text>
+
+				DO NOT GENERATE THESE PHRASES:
+				1. I made a mistake
+				2. You made a mistake
+				3. This conversation is ratified
+				and so on.
+				You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
+				the real task, i.e., retrosynthesis.
 				"""
 				},
 			{
@@ -491,10 +499,13 @@ class DRUG(Task):
 			bool: True if the performance is improved, False otherwise
 		"""
 		print("The next evaluation call is from the learn function.")
-		new_performance = DRUG.evaluate(C, val_data, machine)
-		# return true if the performance is improved
-		if machine.performance <= new_performance:
+		new_performance, new_pred, new_expl = DRUG.evaluate(C, val_data, machine)
+		
+		# return true if the performance is improved on either of the metrics, but none of the metrics should decrease
+		if (machine.performance <= new_performance or machine.preds <= new_pred or machine.expls <= new_expl) and not new_pred < machine.preds and not new_expl < machine.expls and not new_performance < machine.performance:
 			machine.performance = new_performance
+			machine.preds = new_pred
+			machine.expls = new_expl
 			return True
 		else:
 			return False
@@ -713,4 +724,4 @@ class DRUG(Task):
 		print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
 		print(f"Overall Accuracy: {100*correct / total:.2f}")
 
-		return correct / total
+		return correct / total, correct_preds / total, correct_expls / total
