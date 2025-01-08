@@ -1,21 +1,23 @@
 import os
 import pandas as pd
-from openai import OpenAI
 from copy import deepcopy
 from abc import abstractmethod
 from utils import encode_image
-from typing import Tuple, List, Union, Dict, Optional, Callable
+
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
-Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
+from openai import OpenAI
 openai_org = os.getenv("OPENAI_ORG")
 openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
 	organization=openai_org,
 	api_key=openai_key,
 )
+
+from typing import Tuple, List, Union, Dict, Optional
+Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
 class Task:
@@ -99,6 +101,7 @@ class Task:
 			context (Prompt): Current context for the model
 			test_df (pd.DataFrame): Test data
 			machine (Agent): The machine agent
+			kwargs: additional arguments (e.g. ailment for RAD, use-case specific)
 
 		Returns:
 			float: The overall accuracy of the model
@@ -163,7 +166,7 @@ class RAD(Task):
 		return c_j
 
 	@staticmethod
-	def learn(C: List, val_data:pd.DataFrame, machine, **kwargs) -> bool:
+	def learn(C: List, val_data: pd.DataFrame, machine, **kwargs) -> bool:
 		"""
 		Learn the task.
 		
@@ -300,45 +303,45 @@ class RAD(Task):
 			context (Prompt): Current context for the model
 			test_df (pd.DataFrame): Test data
 			machine (Agent): The machine agent
-
-			ailment (str): The ailment to evaluate the model for
+			kwargs:
+				ailment (str): The ailment to evaluate the model for
 
 		Returns:
 			float: The overall accuracy of the model
 		"""
-		
-		
-
 		# initialize the counters
 		total = 0
 		correct_preds = 0
 		correct_expls = 0
 		correct = 0
 
-		match_fn = RAD.match
 		agree_fn = RAD.agree
-		ailment = kwargs["ailment"]
+		ailment = kwargs.pop("ailment", None)
+		if ailment is None:
+			raise ValueError("Ailment not provided. Pass an ailment in the kwargs like ailment='Atelectasis'.")
 
 		print(f"Evaluating for {ailment}...")
 		# prediction prompt
 		pred_prompt = deepcopy(context)
-		pred_prompt.extend([
+		pred_prompt.extend(
+		[
 			{
 				"role": "system",
 				"content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-				You have to strictly response in, no extra text:
+				You have to strictly respond in (no extra text) :
 				*Prediction: Yes/No*
 				"""
-			},
+				},
 			{
 				"role": "user",
 				"content": f"Given the following chest XRay, you have to predict the presence of {ailment}."
-			}
-		]
+				}
+			]
 		)
 
 		expl_prompt = deepcopy(context)
-		expl_prompt.extend([
+		expl_prompt.extend(
+		[
 			{
 				# TODO: check prompt
 				"role": "system",
@@ -347,16 +350,16 @@ class RAD(Task):
 				*Prediction: Yes*
 				*Explanation: <Your explanation here>*
 				"""
-			},
+				},
 			{
 				"role": "user",
 				"content": f"Given the following chest XRay, you have to explain the presence of {ailment}."
-			},
+				},
 			{
 				"role": "assistant",
 				"content": "*Prediction: Yes*"
-			}
-		]
+				}
+   			]
 		)
 
 		# iterate over the test data
@@ -374,10 +377,12 @@ class RAD(Task):
 						"type": "image_url",
 						"image_url": {
 							"url": f"data:image/jpeg;base64,{img}"
+							}
 						}
-					}
-				]
-			}
+					]
+				}
+
+			# redo till we get a valid prediction
 			y = "problem"
 			while y == "problem":
 				y, _, _ = machine.ask(None, pred_prompt + [img_msg], is_prompt=True)
@@ -423,6 +428,7 @@ class RAD(Task):
 
 		return correct / total
 
+
 class DRUG(Task):
 	"""
 	Task for Retrosynthesis.
@@ -453,13 +459,13 @@ class DRUG(Task):
 				*Prediction: <smiles of retrosynthesis product>*
 				*Explanation: <Your explanation here>*
 				"""
-			},
+				},
 			{
 				"role": "user",
 				"content": f"""
 				You have to predict the single step retrosynthesis of {y}.
 				"""
-			}
+				}
 		]
 		if c_j is None:
 			c_j = []
@@ -468,9 +474,9 @@ class DRUG(Task):
 		return c_j
 
 	@staticmethod
-	def learn(C: List, val_data:pd.DataFrame, machine, **kwargs) -> bool:
+	def learn(C: List, val_data: pd.DataFrame, machine, **kwargs) -> bool:
 		"""
-		Learn the task.
+		Check if the model has learned a better understanding of the task.
 		
 		Args:
 			C (List): context
@@ -479,10 +485,9 @@ class DRUG(Task):
 			agree_fn (function): agree_fn
 
 		Returns:
-
+			bool: True if the performance is improved, False otherwise
 		"""
-
-		new_performance = DRUG.evaluate(C,val_data,machine)
+		new_performance = DRUG.evaluate(C, val_data, machine)
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -505,15 +510,17 @@ class DRUG(Task):
 		try:
 			mol1 = Chem.MolFromSmiles(y)
 		except Exception as e:
+			print(f"Exception: {e} while processing {y}: first SMILES string.")
 			mol1 = None
 		
 		try:
 			mol2 = Chem.MolFromSmiles(pred)
 		except Exception as e:
+			print(f"Exception: {e} while processing {pred}: second SMILES string.")
 			mol2 = None
 
 		if mol1 is None or mol2 is None:
-			return False ## FIX 
+			return False ## FIX
 			raise ValueError("Invalid SMILES string provided.")
 
 		# Get canonical SMILES for both molecules
@@ -522,23 +529,19 @@ class DRUG(Task):
 
 		# Alternatively, compare molecular fingerprints
 		fingerprint1 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol1,
-																	radius=2,
-																	nBits=1024)
+                                                            		  radius=2,
+																	  nBits=1024)
 		fingerprint2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2,
-																	radius=2,
-																	nBits=1024)
+																	  radius=2,
+																	  nBits=1024)
 
 		# Check if canonical SMILES or fingerprints match
 		if canonical_smiles1 == canonical_smiles2:
-			res =  True
+			return True
 		elif fingerprint1 == fingerprint2:
-			res = True
+			return True
 		else:
-			res = False
-
-		return res
-
-
+			return False
 
 	@staticmethod
 	def agree(e, e_pred) -> bool:
@@ -561,17 +564,18 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					You are a retrosynthesis expert, with detailed knowledge of all known retrosynthesis pathways and their procedures.
-					Your task is to check consistency between two given explanations of a retrosynthesis pathway.
+					You are a retrosynthesis expert, with detailed knowledge of organic retrosynthesis pathways.
+					Your task is to check consistency between two retrosynthesis pathways.
 					1. VERY IMPORTANT, your answer should be the same if the two explanations of the pathway are swapped, i.e., independent of the order of the two explanations.
-					2. Respond only in Yes/No."""
-				},
+					2. Respond only in Yes/No.
+					"""
+					},
 				{
 					"role": "user",
-					"content": f"Given A: {e} is an explanation of a retrosynthesis pathway, and B: {e_pred} is another explanation of a retrosynthesis pathway, are these two consistent?"
-				},
-			]
-		)
+					"content": f"Given A: {e} is a retrosynthesis pathway, and B: {e_pred} is another retrosynthesis pathway, are these two consistent?"
+					},
+				]
+			)
 
 		# parse the response
 		out = completion.choices[0].message.content.lower()
@@ -603,12 +607,12 @@ class DRUG(Task):
 		assert prediction != "" or explanation != "", "Prediction or Explanation not found in the response."
 		if prediction != "":
 			assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis product>', got " + prediction
-			pred = prediction.split(":",1)[1].strip()
+			pred = prediction.split(":", 1)[1].strip()
 		else:
 			pred = None
 		if explanation != "":
 			assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
-			expl = explanation.split(":",1)[1].strip()
+			expl = explanation.split(":", 1)[1].strip()
 		else:
 			expl = None
 
@@ -647,9 +651,6 @@ class DRUG(Task):
 		correct_expls = 0
 		correct = 0
 
-		match_fn = DRUG.match
-		agree_fn = DRUG.agree
-
 		# iterate over the test data
 		for _, row in test_df.iterrows():
 			total += 1
@@ -657,7 +658,7 @@ class DRUG(Task):
 			mol = row["output"]
 			e = row["explanation"]
 
-			x = (y,mol,e)
+			x = (y, mol, e)
 
 			#pred+expl prompt
 			prompt = deepcopy(context)
@@ -671,14 +672,14 @@ class DRUG(Task):
 					*Prediction: <smiles of retrosynthesis product>*
 					*Explanation: <Your explanation here>*
 					"""
-				},
+					},
 				{
 					"role": "user",
 					"content": f"""
 					You have to predict the single step retrosynthesis of {y}.
 					"""
-				}
-			]
+					}
+				]
 			)
 
 			# get prediction
@@ -686,14 +687,13 @@ class DRUG(Task):
 			
 			
 			# check if the prediction is correct
-			matchOK = match_fn(mol,y_pred)
-			agreeOK = agree_fn(e,e_pred)
+			matchOK = DRUG.match(mol, y_pred)
+			agreeOK = DRUG.agree(e, e_pred)
 			correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0
 
 		# print the results
-		print(f"Molecule: {y}")
 		print(f"Total: {total}")
 		print(f"Correct Predictions: {correct_preds}")
 		print(f"Correct Explanations: {correct_expls}")

@@ -495,7 +495,8 @@ class DRUGHumanStatic(DRUGAgent):
         # add the human's response to the context
         human_response = {
             "role": "user",
-            "content": f"""*Prediction: {y_h}*
+            "content": f"""
+            *Prediction: {y_h}*
             *Explanation: {e_h}*"""
         }
         C.append(human_response)
@@ -505,7 +506,7 @@ class DRUGHumanStatic(DRUGAgent):
 """
 Factory method to create agents.
 """
-def create_agent(task: str, type: str, human_type:str, id: int):
+def create_agent(task: str, type: str, human_type: str, id: int):
     """
     Factory method to create agents.
 
