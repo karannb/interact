@@ -1,12 +1,7 @@
 import os
 import base64
-import pandas as pd
-from copy import deepcopy
+
 from openai import OpenAI
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors
-
-
 openai_org = os.getenv("OPENAI_ORG")
 openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
@@ -14,7 +9,7 @@ client = OpenAI(
 	api_key=openai_key,
 )
 
-from typing import List, Union, Dict, Callable
+from typing import List, Union, Dict
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
