@@ -5,6 +5,8 @@ from copy import deepcopy
 from abc import abstractmethod
 from utils import encode_image, are_molecules_same
 from typing import Tuple, List, Union, Dict, Optional, Callable
+from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
 
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
@@ -39,9 +41,10 @@ class Task:
 		raise NotImplementedError("Subclass must implement abstract method.")
 
 	@abstractmethod
-	def learn(C, ailment, machine, agree_fn):
+	def learn(C, val_data: pd.DataFrame, machine):
 		"""
 		Learn the task.
+		A task is learnt when the performance on the validation set after processing a given instance of data increases
 		"""
 		raise NotImplementedError("Subclass must implement abstract method.")
 
@@ -84,6 +87,21 @@ class Task:
 
 		Returns:
 			Tuple: prediction and explanation
+		"""
+		raise NotImplementedError("Subclass must implement abstract method.")
+	
+	@abstractmethod
+	def evaluate(C: Optional[List], test_df: pd.DataFrame, machine, **kwargs) -> Tuple:
+		"""
+		Evaluates the model on the given test data.
+
+		Args:
+			context (Prompt): Current context for the model
+			test_df (pd.DataFrame): Test data
+			machine (Agent): The machine agent
+
+		Returns:
+			float: The overall accuracy of the model
 		"""
 		raise NotImplementedError("Subclass must implement abstract method.")
 
@@ -145,21 +163,21 @@ class RAD(Task):
 		return c_j
 
 	@staticmethod
-	def learn(C: List, val_data:pd.DataFrame, ailment: str, machine, agree_fn: Callable) -> bool:
+	def learn(C: List, val_data:pd.DataFrame, machine, **kwargs) -> bool:
 		"""
 		Learn the task.
 		
 		Args:
 			C (List): context
-			ailment (str): ailment
 			machine (Agent): machine
-			agree_fn (function): agree_fn
+		kwargs:
+			ailment (str): ailment
 
 		Returns:
 
 		"""
 
-		new_performance = RAD.evaluate(C, val_data, ailment, machine, agree_fn)
+		new_performance = RAD.evaluate(C, val_data, machine, ailment = kwargs["ailment"])
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -274,21 +292,22 @@ class RAD(Task):
 		return pred, expl, C
 
 	@staticmethod
-	def evaluate(context: Prompt, test_df: pd.DataFrame, ailment: str, machine, agree_fn: Callable) -> float:
+	def evaluate(context: Prompt, test_df: pd.DataFrame, machine, **kwargs) -> float:
 		"""
 		Evaluates the model on the given test data.
 
 		Args:
 			context (Prompt): Current context for the model
 			test_df (pd.DataFrame): Test data
-			ailment (str): The ailment to evaluate the model for
 			machine (Agent): The machine agent
-			agree_fn (Callable): Function to check if the explanation agrees with the prediction
+
+			ailment (str): The ailment to evaluate the model for
 
 		Returns:
 			float: The overall accuracy of the model
 		"""
-		print(f"Evaluating for {ailment}...")
+		
+		
 
 		# initialize the counters
 		total = 0
@@ -296,6 +315,11 @@ class RAD(Task):
 		correct_expls = 0
 		correct = 0
 
+		match_fn = RAD.match
+		agree_fn = RAD.agree
+		ailment = kwargs["ailment"]
+
+		print(f"Evaluating for {ailment}...")
 		# prediction prompt
 		pred_prompt = deepcopy(context)
 		pred_prompt.extend([
@@ -444,7 +468,7 @@ class DRUG(Task):
 		return c_j
 
 	@staticmethod
-	def learn(C: List, val_data:pd.DataFrame, machine, match_fn: Callable, agree_fn: Callable) -> bool:
+	def learn(C: List, val_data:pd.DataFrame, machine, **kwargs) -> bool:
 		"""
 		Learn the task.
 		
@@ -458,7 +482,7 @@ class DRUG(Task):
 
 		"""
 
-		new_performance = DRUG.evaluate(C,val_data,machine,match_fn,agree_fn)
+		new_performance = DRUG.evaluate(C,val_data,machine)
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -478,11 +502,42 @@ class DRUG(Task):
 		Returns:
 			bool: True if the prediction matches the example, False otherwise
 		"""
-		res = are_molecules_same(y, pred)
-		if res:
-			return True
+		try:
+			mol1 = Chem.MolFromSmiles(y)
+		except Exception as e:
+			mol1 = None
+		
+		try:
+			mol2 = Chem.MolFromSmiles(pred)
+		except Exception as e:
+			mol2 = None
+
+		if mol1 is None or mol2 is None:
+			raise ValueError("Invalid SMILES string provided.")
+
+		# Get canonical SMILES for both molecules
+		canonical_smiles1 = Chem.MolToSmiles(mol1, canonical=True)
+		canonical_smiles2 = Chem.MolToSmiles(mol2, canonical=True)
+
+		# Alternatively, compare molecular fingerprints
+		fingerprint1 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol1,
+																	radius=2,
+																	nBits=1024)
+		fingerprint2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2,
+																	radius=2,
+																	nBits=1024)
+
+		# Check if canonical SMILES or fingerprints match
+		if canonical_smiles1 == canonical_smiles2:
+			res =  True
+		elif fingerprint1 == fingerprint2:
+			res = True
 		else:
-			return False
+			res = False
+
+		return res
+
+
 
 	@staticmethod
 	def agree(e, e_pred) -> bool:
@@ -505,9 +560,9 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					You are a retrosynthesis expert, with detailed knowledge of all known retrosynthesis procedures.
-					Your task is to check consistency between two given explanations of a retrosynthesis procedure.
-					1. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.
+					You are a retrosynthesis expert, with detailed knowledge of all known retrosynthesis pathways and their procedures.
+					Your task is to check consistency between two given explanations of a retrosynthesis pathway.
+					1. VERY IMPORTANT, your answer should be the same if the two explanations of the pathway are swapped, i.e., independent of the order of the two explanations.
 					2. Respond only in Yes/No."""
 				},
 				{
@@ -547,12 +602,12 @@ class DRUG(Task):
 		assert prediction != "" or explanation != "", "Prediction or Explanation not found in the response."
 		if prediction != "":
 			assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis product>', got " + prediction
-			pred = prediction.split(":")[1].strip()
+			pred = prediction.split(":",1)[1].strip()
 		else:
 			pred = None
 		if explanation != "":
 			assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
-			expl = explanation.split(":")[1].strip()
+			expl = explanation.split(":",1)[1].strip()
 		else:
 			expl = None
 
@@ -569,7 +624,7 @@ class DRUG(Task):
 		return pred, expl, C
 
 	@staticmethod
-	def evaluate(context: Prompt, test_df: pd.DataFrame, machine ,match_fn: Callable, agree_fn: Callable):
+	def evaluate(context: Prompt, test_df: pd.DataFrame, machine, **kwargs):
 		"""
 		Evaluates the model on the given test data.
 
@@ -577,7 +632,7 @@ class DRUG(Task):
 			context (Prompt): Current context for the model
 			test_df (pd.DataFrame): Test data
 			machine (Agent): The machine agent
-			agree_fn (Callable): Function to check if the explanation agrees with the prediction
+            x (Tuple): example of (y, mol, e)
 
 		Returns:
 			float: The overall accuracy of the model
@@ -591,7 +646,9 @@ class DRUG(Task):
 		correct_expls = 0
 		correct = 0
 
-				
+		match_fn = DRUG.match
+		agree_fn = DRUG.agree
+
 		# iterate over the test data
 		for _, row in test_df.iterrows():
 			total += 1
