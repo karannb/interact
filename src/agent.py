@@ -497,8 +497,9 @@ class DRUGHumanStatic(DRUGAgent):
         human_response = {
             "role": "user",
             "content": f"""
-            *Prediction: {y_h}*
-            *Explanation: {e_h}*"""
+            Prediction: {y_h}
+            Pathway: {mol}
+            """
         }
         C.append(human_response)
 
