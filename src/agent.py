@@ -471,6 +471,7 @@ class DRUGHuman(DRUGAgent):
 
         return y_h, e_h, C
 
+
 class DRUGHumanStatic(DRUGAgent):
     """
     Human agent class.
