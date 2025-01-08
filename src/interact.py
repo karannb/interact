@@ -7,13 +7,12 @@ import pickle
 import pandas as pd
 from typing import List
 from copy import deepcopy
-from utils import evaluate
 from tasks import RAD, DRUG
 from agent import create_agent
 from argparse import ArgumentParser
 
 
-def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> List:
+def Interact(train_data, val_data, test_data, human_type, eval_at_start, task: str, h: int, m: int, n: int, k: int = 3) -> List:
     """
     Core interact function between the human and the machine.
 
@@ -36,14 +35,19 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
 
     # Initialize the agents
     assert task in ["RAD", "DRUG"], "Invalid task, expected 'RAD' or 'DRUG', got " + task
-    human = create_agent(task, "Human", h)
-    machine = create_agent(task, "Machine", m)
+
+
+    human = create_agent(task, "Human", human_type, h)
+    machine = create_agent(task, "Machine",human_type, m)
+
     agree_fn = RAD.agree if task == "RAD" else DRUG.agree
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
+    evaluate_fn = RAD.evaluate if task == "RAD" else DRUG.evaluate
 
     # initial performance on the test data
-    if test_data is not None:
-        evaluate([], test_data, "Pneumothorax", machine, agree_fn)
+    if eval_at_start:
+        if test_data is not None and task == "RAD":
+            evaluate_fn([], test_data, "Pneumothorax", machine, agree_fn)
 
     # metrics
     total_sessions = 0
@@ -52,7 +56,7 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
     l_m_revision = False
 
     # Iterate over all input data
-    for idx, x in data:
+    for idx, x in train_data:
         # Generate a random session identifier and store the input data
 
         sess = uuid.uuid4().hex[:4]
@@ -92,11 +96,11 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
             f.write(f"sessionID-{sess}, ailment-{label} ::: tags-{tags}\n")
 
         # decide if the context is helpful
-        if learn_fn(C_, label, machine, agree_fn):
+        if learn_fn(C_, val_data, machine):
             C = C_
 
         if (test_data is not None) and (l_m_revision):
-            evaluate(C, test_data, label, machine, agree_fn)
+            evaluate_fn(C, test_data, machine)
         # only check for ratify because, in this special case,
         # human agent can never revise.
         l_h, l_m = mu_h[0], mu_m[0]
@@ -114,7 +118,8 @@ def Interact(data, test_data, task: str, h: int, m: int, n: int, k: int = 3) -> 
 
     # final performance on the test data
     if test_data is not None:
-        evaluate(C, test_data, label, machine, agree_fn)
+        # evaluate_fn(C, test_data, label, machine, agree_fn)
+        evaluate_fn(C, test_data, machine, ailment=label)
 
     return D, M, C
 
@@ -126,38 +131,43 @@ if __name__ == "__main__":
     parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
     parser.add_argument("--ailment", type=str, default="Atelectasis")
     parser.add_argument("--mode", type=str, default="alphabetical", choices=["random", "ascending", "descending", "alphabetical"])
+    parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time","static"])
+    parser.add_argument("--eval_at_start", type=bool, default=False)
+
     args = parser.parse_args()
 
     if args.task == "order-checks":
         if args.mode == "random":
-            data = pd.read_csv(f"data/xray_data_5_rand.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5_rand.csv", index_col=None)
         elif args.mode == "ascending":
-            data = pd.read_csv(f"data/xray_data_5_asc.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5_asc.csv", index_col=None)
         elif args.mode == "descending":
-            data = pd.read_csv(f"data/xray_data_5_asc.csv", index_col=None)
-            data = data[::-1].reset_index(drop=True) 
+            train_data = pd.read_csv(f"train_data/xray_data_5_asc.csv", index_col=None)
+            train_data = train_data[::-1].reset_index(drop=True) 
         elif args.mode == "alphabetical":
-            data = pd.read_csv(f"data/xray_data_5.csv", index_col=None)
+            train_data = pd.read_csv(f"train_data/xray_data_5.csv", index_col=None)
         args.task = "RAD"
         test_data = None
     elif args.task == "RAD":
-        data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
+        train_data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
         test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
+        train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
+        test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
     elif args.task == "DRUG":
         # DRUG task has a different separator (;)
         data = pd.read_csv("data/retro.csv", sep=";", index_col=None)
         # split the data into train, val and test
         total = len(data)
-        train_data = data[:(total // 3)]
-        val_data = data[(total // 3):(2 * total // 3)]
-        test_data = data[(2 * total // 3):]
+        train_data = data[:int(total * 0.6)]
+        val_data = data[int(total * 0.6) : int(total * 0.8)]
+        test_data = data[int(total * 0.8):]
+
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 
-    data = data.drop(columns=["case", "label_short", "link"], inplace=False)
-    test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
-    iterdata = data.iterrows()
-    D, M, C = Interact(iterdata, test_data, task=args.task, h=1, m=2, n=args.n)
+    
+    iterdata = train_data.iterrows()
+    D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, eval_at_start=args.eval_at_start, task=args.task, h=1, m=2, n=args.n)
     # save the relational databases
     if not os.path.exists("results"):
         os.makedirs("results")

@@ -3,7 +3,6 @@ from functools import partial
 from abc import abstractmethod
 
 from tasks import RAD, DRUG
-from utils import encode_image
 
 import os
 from openai import OpenAI
@@ -320,7 +319,7 @@ class DRUGAgent(Agent):
 
         Args:
             C (List[Dict]): Current context
-            x (Tuple): example of (y, mol)
+            x (Tuple): example of (y, mol, e)
             mu (Tuple): tuple of (l, y, e)
             j (int): interaction identifier
 
@@ -328,7 +327,8 @@ class DRUGAgent(Agent):
             List[Dict]: new context
         """
         # get the molecule being discussed
-        _, mol = x
+        
+        _, mol, _ = x
 
         if j == 1:
             # first messages are just information about the models
@@ -338,7 +338,7 @@ class DRUGAgent(Agent):
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. The correct retrosynthesis pathway is: " + C[-1]["content"]
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
@@ -347,7 +347,7 @@ class DRUGAgent(Agent):
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. The correct retrosynthesis pathway is: " + C[-1]["content"]
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
@@ -387,7 +387,7 @@ class DRUGMachine(DRUGAgent):
     def __init__(self, id: int):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
-                           model="gpt-o1-preview",
+                           model="gpt-3.5-turbo-0125",
                            max_tokens=300,
                            seed=42)
 
@@ -470,11 +470,42 @@ class DRUGHuman(DRUGAgent):
 
         return y_h, e_h, C
 
+class DRUGHumanStatic(DRUGAgent):
+    """
+    Human agent class.
+    """
+    def __init__(self, id: int):
+        super().__init__("Human", id)
+
+    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
+        """
+        Ask the human for a response.
+
+        Args:
+            x (Tuple): (y, mol, e) tuple.
+            C (List[Dict]): context
+            is_prompt (bool): whether the C is a prompt or not
+
+        Returns:
+            Tuple: prediction, explanation and updated context
+        """
+        # current session & example
+        y_h, mol, e_h = x
+
+        # add the human's response to the context
+        human_response = {
+            "role": "user",
+            "content": f"""*Prediction: {y_h}*
+            *Explanation: {e_h}*"""
+        }
+        C.append(human_response)
+
+        return y_h, e_h, C
 
 """
 Factory method to create agents.
 """
-def create_agent(task: str, type: str, id: int):
+def create_agent(task: str, type: str, human_type:str, id: int):
     """
     Factory method to create agents.
 
@@ -497,7 +528,10 @@ def create_agent(task: str, type: str, id: int):
         if type == "Machine":
             return DRUGMachine(id)
         elif type == "Human":
-            return DRUGHuman(id)
+            if human_type == "real-time":
+                return DRUGHuman(id)
+            elif human_type == "static":
+                return DRUGHumanStatic(id)
         else:
             raise ValueError(f"Invalid agent type: {type}")
     else:
