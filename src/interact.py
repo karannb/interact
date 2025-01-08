@@ -45,7 +45,6 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
     machine = create_agent(task, "Machine",human_type, m)
 
     # Select the task-specific functions
-    agree_fn = RAD.agree if task == "RAD" else DRUG.agree
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
     evaluate_fn = RAD.evaluate if task == "RAD" else DRUG.evaluate
 
@@ -151,6 +150,7 @@ if __name__ == "__main__":
 
     if args.task == "RAD":
         train_data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
+        val_data = pd.read_csv(f"data/val/{args.ailment}.csv", index_col=None)
         test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
         train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
         test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None

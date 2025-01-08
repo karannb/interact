@@ -140,13 +140,13 @@ class RAD(Task):
 				*Prediction: Yes/No*
 				*Explanation: <Your explanation here>*
 				"""
-			},
+				},
 			{
 				"role": "user",
 				"content": f"""
 				Given the following chest XRay, you have to predict the presence of {y}.
 				"""
-			},
+				},
 			{
 				"role": "user",
 				"content": [
@@ -154,11 +154,11 @@ class RAD(Task):
 						"type": "image_url",
 						"image_url": {
 							"url": f"data:image/jpeg;base64,{encoded_img}"
+							}
 						}
-					}
-				]
-			}
-		]
+					]
+				}
+			]
 		if c_j is None:
 			c_j = []
 
@@ -177,9 +177,8 @@ class RAD(Task):
 			ailment (str): ailment
 
 		Returns:
-
+			bool: True if the performance is improved, False otherwise
 		"""
-
 		new_performance = RAD.evaluate(C, val_data, machine, ailment = kwargs["ailment"])
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
@@ -453,17 +452,19 @@ class DRUG(Task):
 			{
 				"role": "system",
 				"content": """
-				Pretend that you are a helpful retrosynthesis expert, with detailed knowledge of all known retrosynthesis procedures.
+				You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
+				Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
 				It is also known that the user's predictions are always correct, i.e., ground truth.
+
 				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: <smiles of retrosynthesis product>*
-				*Explanation: <Your explanation here>*
+				Prediction: <smiles of retrosynthesis input>
+				Pathway: <the retrosynthesis pathway described in text>
 				"""
 				},
 			{
 				"role": "user",
 				"content": f"""
-				You have to predict the single step retrosynthesis of {y}.
+				You have to predict a single step retrosynthetic pathway for {y}.
 				"""
 				}
 		]
@@ -596,22 +597,30 @@ class DRUG(Task):
 		Returns:
 			Tuple: prediction and explanation
 		"""
+		# parse LLM response
 		response = response.choices[0].message.content
 		pred_and_expl = response.split("\n")
 		prediction, explanation = "", ""
 		for text in pred_and_expl:
 			if "Prediction" in text:
 				prediction = text
-			if "Explanation" in text:
+			if "Pathway" in text:
 				explanation = text
-		assert prediction != "" or explanation != "", "Prediction or Explanation not found in the response."
+		assert prediction != "" or explanation != "", "Prediction or Pathway not found in the response."
+
+		# extract prediction
 		if prediction != "":
-			assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis product>', got " + prediction
+			assert "Prediction" in prediction, f"Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis input>', got {prediction}."
 			pred = prediction.split(":", 1)[1].strip()
+			# check if the SMILES string is valid
+			smiles = Chem.MolFromSmiles(pred)
+			assert smiles is not None, f"Invalid SMILES string provided: {pred}."
 		else:
 			pred = None
+
+		# extract explanation
 		if explanation != "":
-			assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
+			assert "Pathway" in explanation, f"Pathway not found in the response, expected 'Pathway: <Your explanation here>', got {explanation}."
 			expl = explanation.split(":", 1)[1].strip()
 		else:
 			expl = None
@@ -666,17 +675,18 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					Pretend that you are a helpful retrosynthesis expert, with detailed knowledge of all known retrosynthesis procedures.
-					It is also known that the user's predictions are always correct, i.e., ground truth.
+					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
+					Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
+
 					You have to strictly adhere to the following format in your response, no extra text:
-					*Prediction: <smiles of retrosynthesis product>*
-					*Explanation: <Your explanation here>*
+					Prediction: <smiles of retrosynthesis input>
+					Pathway: <the retrosynthesis pathway described in text>
 					"""
 					},
 				{
 					"role": "user",
 					"content": f"""
-					You have to predict the single step retrosynthesis of {y}.
+					You have to predict a single step retrosynthetic pathway for {y}.
 					"""
 					}
 				]
@@ -684,8 +694,7 @@ class DRUG(Task):
 
 			# get prediction
 			y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
-			
-			
+
 			# check if the prediction is correct
 			matchOK = DRUG.match(mol, y_pred)
 			agreeOK = DRUG.agree(e, e_pred)

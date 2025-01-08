@@ -113,7 +113,7 @@ class Agent:
         Args:
             C (List[Dict]): Current context
             x (Tuple): example of (y, img, e)
-            mu (Tuple): tuple of (l, y, e)
+            l_hat (str): predicted label
             j (int): interaction identifier
 
         Returns:
@@ -155,14 +155,14 @@ class RADAgent(Agent):
         self.match = RAD.match
         self.agree = RAD.agree
 
-    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+    def update_context(self, C: List[Dict], x: Tuple, l_hat: str, j: int) -> List[Dict]:
         """
         Updates context, i.e. the conversation to make it more conversation-like.
 
         Args:
             C (List[Dict]): Current context
             x (Tuple): example of (y, img, e)
-            mu (Tuple): tuple of (l, y, e)
+            l_hat (str): predicted label
             j (int): interaction identifier
 
         Returns:
@@ -247,6 +247,7 @@ class RADMachine(RADAgent):
         else:
             P_j = self.assemble_prompt(x, C)
         response = self.llm(messages=P_j)
+
         try:
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
@@ -288,7 +289,8 @@ class RADHuman(RADAgent):
             "role": "user",
             "content": f"""
             *Prediction: Yes*
-            *Explanation: {e}*"""
+            *Explanation: {e}*
+            """
         }
         C.append(human_response)
 
@@ -327,7 +329,6 @@ class DRUGAgent(Agent):
             List[Dict]: new context
         """
         # get the molecule being discussed
-        
         _, mol, _ = x
 
         if j == 1:
@@ -338,16 +339,16 @@ class DRUGAgent(Agent):
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. The correct retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[-1]["content"]
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. " + C[-1]["content"]
+                C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
                 C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. The correct retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[-1]["content"]
             elif l_hat == "revise":
                 C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
             elif l_hat == "refute":
