@@ -179,6 +179,7 @@ class RAD(Task):
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
+		print("The next evaluation call is from the learn function.")
 		new_performance = RAD.evaluate(C, val_data, machine, ailment = kwargs["ailment"])
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
@@ -308,6 +309,8 @@ class RAD(Task):
 		Returns:
 			float: The overall accuracy of the model
 		"""
+		print(f"Evaluating for {ailment}...")
+
 		# initialize the counters
 		total = 0
 		correct_preds = 0
@@ -319,7 +322,6 @@ class RAD(Task):
 		if ailment is None:
 			raise ValueError("Ailment not provided. Pass an ailment in the kwargs like ailment='Atelectasis'.")
 
-		print(f"Evaluating for {ailment}...")
 		# prediction prompt
 		pred_prompt = deepcopy(context)
 		pred_prompt.extend(
@@ -488,6 +490,7 @@ class DRUG(Task):
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
+		print("The next evaluation call is from the learn function.")
 		new_performance = DRUG.evaluate(C, val_data, machine)
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
@@ -651,8 +654,7 @@ class DRUG(Task):
 		Returns:
 			float: The overall accuracy of the model
 		"""
-
-		# print(f"Evaluating for {ailment}...")
+		print("Evaluating on test set...")
 
 		# initialize the counters
 		total = 0

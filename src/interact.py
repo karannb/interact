@@ -104,7 +104,10 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 
         # store the tags
         with open("tags.txt", "a") as f:
-            f.write(f"sessionID-{sess}, ailment-{label} ::: tags-{tags}\n")
+            if task == "RAD":
+                f.write(f"sessionID-{sess}, ailment-{label} ::: tags-{tags}\n")
+            elif task == "DRUG":
+                f.write(f"sessionID-{sess}, mol-{label} ::: tags-{tags}\n")
 
         # decide if the context is helpful
         if learn_fn(C_, val_data, machine):
@@ -159,12 +162,13 @@ if __name__ == "__main__":
         test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
     elif args.task == "DRUG":
         # DRUG task has a different separator (;)
-        data = pd.read_csv("data/retro.csv", sep=";", index_col=None)
+        data = pd.read_csv("data/retro.csv", sep=";", index_col=None) # by default in y, x, e format, i.e. x ->^e y
+        data = data[["output", "input", "explanation"]] # x, y, e format
         # split the data into train, val and test
         total = len(data)
-        train_data = data[:int(total * 0.6)]
-        val_data = data[int(total * 0.6) : int(total * 0.8)]
-        test_data = data[int(total * 0.8):]
+        train_data = data[:int(total * 0.15)]
+        val_data = data[int(total * 0.6) : int(total * 0.7)]
+        test_data = data[int(total * 0.7) : int(total * 0.8)]
     else:
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 

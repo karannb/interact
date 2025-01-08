@@ -389,7 +389,7 @@ class DRUGMachine(DRUGAgent):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
                            model="gpt-3.5-turbo-0125",
-                           max_tokens=300,
+                           max_tokens=1024,
                            seed=42)
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
