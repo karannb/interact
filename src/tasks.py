@@ -501,11 +501,9 @@ class DRUG(Task):
 		print("The next evaluation call is from the learn function.")
 		new_performance, new_pred, new_expl = DRUG.evaluate(C, val_data, machine)
 		
-		# return true if the performance is improved on either of the metrics, but none of the metrics should decrease
-		if (machine.performance <= new_performance or machine.preds <= new_pred or machine.expls <= new_expl) and not new_pred < machine.preds and not new_expl < machine.expls and not new_performance < machine.performance:
+		# return true if the performance is improved
+		if machine.performance <= new_performance:
 			machine.performance = new_performance
-			machine.preds = new_pred
-			machine.expls = new_expl
 			return True
 		else:
 			return False
