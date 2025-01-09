@@ -499,7 +499,7 @@ class DRUG(Task):
 			bool: True if the performance is improved, False otherwise
 		"""
 		print("The next evaluation call is from the learn function.")
-		new_performance, new_pred, new_expl = DRUG.evaluate(C, val_data, machine)
+		new_performance, new_pred, new_expl = DRUG.evaluate(C, val_data, machine, set="VAL")
 		
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
@@ -659,11 +659,12 @@ class DRUG(Task):
 			test_df (pd.DataFrame): Test data
 			machine (Agent): The machine agent
             x (Tuple): example of (y, mol, e)
+			set(str): which set the model is being evaluated on
 
 		Returns:
 			float: The overall accuracy of the model
 		"""
-		print("Evaluating on test set...")
+		print(f"Evaluating on {kwargs["set"]} set...")
 
 		# initialize the counters
 		total = 0
@@ -714,6 +715,7 @@ class DRUG(Task):
 			correct += 1 if matchOK and agreeOK else 0
 
 		# print the results
+		print(f"Accuracy on {kwargs["set"]}")
 		print(f"Total: {total}")
 		print(f"Correct Predictions: {correct_preds}")
 		print(f"Correct Explanations: {correct_expls}")
@@ -721,5 +723,23 @@ class DRUG(Task):
 		print(f"Prediction Accuracy: {100*correct_preds / total:.2f}")
 		print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
 		print(f"Overall Accuracy: {100*correct / total:.2f}")
+
+		log_str = f"""
+				\n
+***********************************************************
+Accuracy on {kwargs["set"]}
+Total: {total}
+Correct Predictions: {correct_preds}
+Correct Explanations: {correct_expls}
+Correct Overall: {correct}
+Prediction Accuracy: {100*correct_preds / total:.2f}
+Explanation Accuracy: {100*correct_expls / total:.2f}
+Overall Accuracy: {100*correct / total:.2f}
+***********************************************************
+		"""
+
+		f = open("results/accuracy_log.txt","a+")
+		f.write(log_str)
+		f.close()
 
 		return correct / total, correct_preds / total, correct_expls / total
