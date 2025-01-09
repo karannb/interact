@@ -459,8 +459,8 @@ class DRUG(Task):
 				It is also known that the user's predictions are always correct, i.e., ground truth.
 
 				You have to strictly adhere to the following format in your response, no extra text:
-				Prediction: <smiles of retrosynthesis input>
-				Pathway: <the retrosynthesis pathway described in text>
+				*Prediction: <smiles of retrosynthesis product>*
+                *Explanation: <Your explanation here>*
 
 				DO NOT GENERATE THESE PHRASES:
 				1. I made a mistake
@@ -585,7 +585,7 @@ class DRUG(Task):
 					},
 				{
 					"role": "user",
-					"content": f"Given A: {e} is a retrosynthesis pathway, and B: {e_pred} is another retrosynthesis pathway, are these two consistent?"
+					"content": f"Given A: {e} is an explanation of a retrosynthesis pathway, and B: {e_pred} is another explanation of a retrosynthesis pathway, are these two consistent?"
 					},
 				]
 			)
@@ -691,8 +691,8 @@ class DRUG(Task):
 					Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
 
 					You have to strictly adhere to the following format in your response, no extra text:
-					Prediction: <smiles of retrosynthesis input>
-					Pathway: <the retrosynthesis pathway described in text>
+					*Prediction: <smiles of retrosynthesis product>*
+                	*Explanation: <Your explanation here>*
 					"""
 					},
 				{
