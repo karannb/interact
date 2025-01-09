@@ -56,7 +56,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 			evaluate_fn([], test_data, machine, ailment="Pneumothorax")
 		elif task == "DRUG":
 			evaluate_fn([], test_data, machine, set="TEST_START")
-			print("evaluation at start complete.")
+		print("Evaluation at start complete.")
 
 	# metrics
 	total_sessions = 0
@@ -143,13 +143,13 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 			evaluate_fn(C, test_data, machine, set="TEST_END")
 
 	log_str = f"""
-###################################
-SESSION INTELLIGIBILITY DATA:
-Total Sessions: {total_sessions}
-One-way Human: {one_way_human}
-One-way Machine: {one_way_machine}
-Two-way: {two_way}
-"""
+	###################################
+	SESSION INTELLIGIBILITY DATA:
+	Total Sessions: {total_sessions}
+	One-way Human: {one_way_human}
+	One-way Machine: {one_way_machine}
+	Two-way: {two_way}
+	"""
 
 	f = open("results/accuracy_log.txt","a+")
 	f.write(log_str)
@@ -175,17 +175,13 @@ if __name__ == "__main__":
 		train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
 		test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
 	elif args.task == "DRUG":
-		# DRUG task has a different separator (;)
-		# data = pd.read_csv("data/retro.csv", sep=";", index_col=None) # by default in y, x, e format, i.e. x ->^e y
-		data = pd.read_csv("data/retro_match_sorted.csv", index_col=None)
-		data = data[["output", "input", "explanation"]] # x, y, e format
+		data = pd.read_csv("data/retro_match_sorted.csv", index_col=None) # by default in y, x, e format, i.e. y ->^e x
+		data.drop(columns=["matchOK"], inplace=True)
 		# split the data into train, val and test
 		total = len(data)
 		train_data = data[:int(total * 0.1)]
 		val_data = data[int(total * 0.6) : int(total * 0.8)]
 		test_data = data[int(total * 0.8) :]
-
-		print(len(train_data));print(len(val_data));print(len(test_data))
 	else:
 		raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 

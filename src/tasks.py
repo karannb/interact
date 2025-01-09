@@ -449,7 +449,7 @@ class DRUG(Task):
 		Returns:
 			Prompt: prompt
 		"""
-		y, _, _ = x
+		_, mol, _ = x
 		messages = [
 			{
 				"role": "system",
@@ -459,8 +459,8 @@ class DRUG(Task):
 				It is also known that the user's predictions are always correct, i.e., ground truth.
 
 				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: <smiles of retrosynthesis product>*
-                *Explanation: <Your explanation here>*
+				Prediction: <smiles of retrosynthesis input>
+				Pathway: <the retrosynthesis pathway described in text>
 
 				DO NOT GENERATE THESE PHRASES:
 				1. I made a mistake
@@ -474,7 +474,7 @@ class DRUG(Task):
 			{
 				"role": "user",
 				"content": f"""
-				You have to predict a single step retrosynthetic pathway for {y}.
+				You have to predict a single step retrosynthetic pathway for {mol}.
 				"""
 				}
 		]
@@ -499,7 +499,7 @@ class DRUG(Task):
 			bool: True if the performance is improved, False otherwise
 		"""
 		print("The next evaluation call is from the learn function.")
-		new_performance, new_pred, new_expl = DRUG.evaluate(C, val_data, machine, set="VAL")
+		new_performance = DRUG.evaluate(C, val_data, machine, set="VAL")
 		
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
@@ -521,37 +521,39 @@ class DRUG(Task):
 			bool: True if the prediction matches the example, False otherwise
 		"""
 		try:
-			mol1 = Chem.MolFromSmiles(y)
+			# y can have multiple molecules, separated by a "."
+			y = y.split(".")
+			y = [Chem.MolFromSmiles(mol) for mol in y if (mol != "" and mol is not None)]
 		except Exception as e:
 			print(f"Exception: {e} while processing {y}: first SMILES string.")
-			mol1 = None
+			y = None
 		
 		try:
-			mol2 = Chem.MolFromSmiles(pred)
+			pred = pred.split(".")
+			pred = [Chem.MolFromSmiles(mol) for mol in pred]
 		except Exception as e:
 			print(f"Exception: {e} while processing {pred}: second SMILES string.")
-			mol2 = None
+			pred = None
 
-		if mol1 is None or mol2 is None:
-			return False ## FIX
+		if pred is None or y is None:
 			raise ValueError("Invalid SMILES string provided.")
 
 		# Get canonical SMILES for both molecules
-		canonical_smiles1 = Chem.MolToSmiles(mol1, canonical=True)
-		canonical_smiles2 = Chem.MolToSmiles(mol2, canonical=True)
+		canonical_smiles_pred = set([Chem.MolToSmiles(mol, canonical=True) for mol in pred])
+		canonical_smiles_y = set([Chem.MolToSmiles(mol, canonical=True) for mol in y])
 
 		# Alternatively, compare molecular fingerprints
-		fingerprint1 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol1,
-                                                            		  radius=2,
-																	  nBits=1024)
-		fingerprint2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2,
-																	  radius=2,
-																	  nBits=1024)
+		fingerprints_pred = set([rdMolDescriptors.GetMorganFingerprintAsBitVect(mol,
+																				radius=2,
+																				nBits=1024) for mol in pred])
+		fingerprint_y = set([rdMolDescriptors.GetMorganFingerprintAsBitVect(mol,
+																			radius=2,
+																			nBits=1024) for mol in y])
 
 		# Check if canonical SMILES or fingerprints match
-		if canonical_smiles1 == canonical_smiles2:
+		if len(canonical_smiles_pred.intersection(canonical_smiles_y)) > 0:
 			return True
-		elif fingerprint1 == fingerprint2:
+		elif len(fingerprints_pred.intersection(fingerprint_y)) > 0:
 			return True
 		else:
 			return False
@@ -577,10 +579,10 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					You are a retrosynthesis expert, with detailed knowledge of organic retrosynthesis pathways.
-					Your task is to check consistency between two retrosynthesis pathways.
-					1. VERY IMPORTANT, your answer should be the same if the two explanations of the pathway are swapped, i.e., independent of the order of the two explanations.
-					2. Respond only in Yes/No.
+					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
+					Your role is to check consistency between two retrosynthesis pathways.
+					1. VERY IMPORTANT, your answer should be the same if the two explanations of the pathway are swapped, i.e., independent of the order.
+					2. Respond only in Yes OR No.
 					"""
 					},
 				{
@@ -625,8 +627,12 @@ class DRUG(Task):
 			assert "Prediction" in prediction, f"Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis input>', got {prediction}."
 			pred = prediction.split(":", 1)[1].strip()
 			# check if the SMILES string is valid
-			smiles = Chem.MolFromSmiles(pred)
-			assert smiles is not None, f"Invalid SMILES string provided: {pred}."
+			mols = pred.split(".")
+			smiles = []
+			for mol in mols:
+				mol = Chem.MolFromSmiles(mol)
+				smiles.append(mol)
+			assert None not in smiles, f"Invalid SMILES string provided: {pred}."
 		else:
 			pred = None
 
@@ -664,7 +670,8 @@ class DRUG(Task):
 		Returns:
 			float: The overall accuracy of the model
 		"""
-		print(f"Evaluating on {kwargs["set"]} set...")
+		set_name = kwargs.pop("set", None)
+		print(f"Evaluating on {set_name} set...")
 
 		# initialize the counters
 		total = 0
@@ -691,14 +698,14 @@ class DRUG(Task):
 					Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
 
 					You have to strictly adhere to the following format in your response, no extra text:
-					*Prediction: <smiles of retrosynthesis product>*
-                	*Explanation: <Your explanation here>*
+					Prediction: <smiles of retrosynthesis product>
+                	Explanation: <Your explanation here>
 					"""
 					},
 				{
 					"role": "user",
 					"content": f"""
-					You have to predict a single step retrosynthetic pathway for {y}.
+					You have to predict a single step retrosynthetic pathway for {mol}.
 					"""
 					}
 				]
@@ -715,7 +722,7 @@ class DRUG(Task):
 			correct += 1 if matchOK and agreeOK else 0
 
 		# print the results
-		print(f"Accuracy on {kwargs["set"]}")
+		print(f"Accuracy on {set_name}")
 		print(f"Total: {total}")
 		print(f"Correct Predictions: {correct_preds}")
 		print(f"Correct Explanations: {correct_expls}")
@@ -725,21 +732,20 @@ class DRUG(Task):
 		print(f"Overall Accuracy: {100*correct / total:.2f}")
 
 		log_str = f"""
-				\n
-***********************************************************
-Accuracy on {kwargs["set"]}
-Total: {total}
-Correct Predictions: {correct_preds}
-Correct Explanations: {correct_expls}
-Correct Overall: {correct}
-Prediction Accuracy: {100*correct_preds / total:.2f}
-Explanation Accuracy: {100*correct_expls / total:.2f}
-Overall Accuracy: {100*correct / total:.2f}
-***********************************************************
+		***********************************************************
+		Accuracy on {kwargs["set"]}
+		Total: {total}
+		Correct Predictions: {correct_preds}
+		Correct Explanations: {correct_expls}
+		Correct Overall: {correct}
+		Prediction Accuracy: {100*correct_preds / total:.2f}
+		Explanation Accuracy: {100*correct_expls / total:.2f}
+		Overall Accuracy: {100*correct / total:.2f}
+		***********************************************************
 		"""
 
 		f = open("results/accuracy_log.txt","a+")
 		f.write(log_str)
 		f.close()
 
-		return correct / total, correct_preds / total, correct_expls / total
+		return correct / total
