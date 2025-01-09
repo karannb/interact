@@ -390,7 +390,7 @@ class DRUGMachine(DRUGAgent):
     def __init__(self, id: int):
         super().__init__("Machine", id)
         self.llm = partial(client.chat.completions.create, 
-                           model="gpt-3.5-turbo-0125",
+                           model="gpt-4o",
                            max_tokens=1024,
                            seed=42)
 

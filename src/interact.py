@@ -189,6 +189,7 @@ if __name__ == "__main__":
 	else:
 		raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 
+	open("results/accuracy_log.txt", "w").close() #erase file before every run
 	# Interact with the agents
 	iterdata = train_data.iterrows()
 	D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, 
