@@ -455,12 +455,14 @@ class DRUG(Task):
 				"role": "system",
 				"content": """
 				You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
-				Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
+				Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
 				It is also known that the user's predictions are always correct, i.e., ground truth.
 
 				You have to strictly adhere to the following format in your response, no extra text:
-				Prediction: <smiles of retrosynthesis input>
-				Pathway: <the retrosynthesis pathway described in text>
+				*Prediction: <smiles of retrosynthesis input>*
+				*Pathway: <the retrosynthesis pathway described in text>*
+
+				If there are multiple input SMILES, separate them by a period '.'.
 
 				DO NOT GENERATE THESE PHRASES:
 				1. I made a mistake
@@ -472,7 +474,7 @@ class DRUG(Task):
 				"""
 				},
 			{
-				"role": "user",
+				"role": "system",
 				"content": f"""
 				You have to predict a single step retrosynthetic pathway for {mol}.
 				"""
@@ -523,7 +525,7 @@ class DRUG(Task):
 		try:
 			# y can have multiple molecules, separated by a "."
 			y = y.split(".")
-			y = [Chem.MolFromSmiles(mol) for mol in y if (mol != "" and mol is not None)]
+			y = [Chem.MolFromSmiles(mol) for mol in y]
 		except Exception as e:
 			print(f"Exception: {e} while processing {y}: first SMILES string.")
 			y = None
@@ -625,14 +627,26 @@ class DRUG(Task):
 		# extract prediction
 		if prediction != "":
 			assert "Prediction" in prediction, f"Prediction not found in the response, expected 'Prediction: <smiles of retrosynthesis input>', got {prediction}."
-			pred = prediction.split(":", 1)[1].strip()
+			pred = prediction.split(":", 1)[1].split("*")[0].strip()
 			# check if the SMILES string is valid
 			mols = pred.split(".")
 			smiles = []
+			# to store only valid SMILES strings
+			new_pred = []
+			# iterate to find valid SMILES strings
 			for mol in mols:
-				mol = Chem.MolFromSmiles(mol)
-				smiles.append(mol)
-			assert None not in smiles, f"Invalid SMILES string provided: {pred}."
+				mol_obj = Chem.MolFromSmiles(mol)
+				smiles.append(mol_obj)
+				if mol_obj is not None:
+					new_pred.append(mol)
+			# if all are None, raise an error
+			if all([x == None for x in smiles]):
+				raise AssertionError(f"Invalid SMILES string provided: {pred}.")
+			# if some are None, print a warning
+			elif any([x == None for x in smiles]):
+				print(f"A few invalid SMILES strings were provided: {pred}, but the rest are valid.")
+				pred = ".".join(new_pred)
+				print(f"New prediction (with valid SMILES) : {pred}")
 		else:
 			pred = None
 
@@ -694,16 +708,26 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
-					Your role is to analyze the target molecule and suggest viable retrosynthetic pathways.
+					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
+					Your role is to analyze the target molecule and suggest a viable retrosynthetic pathway.
 
 					You have to strictly adhere to the following format in your response, no extra text:
-					Prediction: <smiles of retrosynthesis product>
-                	Explanation: <Your explanation here>
+					*Prediction: <smiles of retrosynthesis input>*
+					*Pathway: <the retrosynthesis pathway described in text>*
+
+					If there are multiple input SMILES, separate them by a period '.'.
+
+					DO NOT GENERATE THESE PHRASES:
+					1. I made a mistake
+					2. You made a mistake
+					3. This conversation is ratified
+					and so on.
+					You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
+					the real task, i.e., retrosynthesis.
 					"""
 					},
 				{
-					"role": "user",
+					"role": "system",
 					"content": f"""
 					You have to predict a single step retrosynthetic pathway for {mol}.
 					"""
@@ -712,10 +736,14 @@ class DRUG(Task):
 			)
 
 			# get prediction
-			y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
+			y_pred = "problem"
+			while y_pred == "problem":
+				y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
+				if y_pred == "problem":
+					print("Problem with prediction, retrying...")
 
 			# check if the prediction is correct
-			matchOK = DRUG.match(mol, y_pred)
+			matchOK = DRUG.match(y, y_pred)
 			agreeOK = DRUG.agree(e, e_pred)
 			correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
 			correct_expls += 1 if agreeOK else 0
@@ -733,7 +761,7 @@ class DRUG(Task):
 
 		log_str = f"""
 		***********************************************************
-		Accuracy on {kwargs["set"]}
+		Accuracy on {set_name}
 		Total: {total}
 		Correct Predictions: {correct_preds}
 		Correct Explanations: {correct_expls}

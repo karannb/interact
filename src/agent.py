@@ -65,7 +65,7 @@ class Agent:
                 _, ypp, epp = M[-2][3] # message from prev prev agent
             # now check for categories
             if j % 2 == 0: # human
-                # we decide to put the ground truth first 
+                # we decide to put the ground truth first
                 # and then the prediction / generation
                 matchOK = self.match(ypp, yp)
                 agreeOK = self.agree(epp, ep)
@@ -330,8 +330,6 @@ class DRUGAgent(Agent):
         Returns:
             List[Dict]: new context
         """
-        # get the molecule being discussed
-        _, mol, _ = x
 
         if j == 1:
             # first messages are just information about the models
@@ -359,10 +357,8 @@ class DRUGAgent(Agent):
                     # if we had refuted two steps ago, we need to send the same opinion again
                     # without the refutation added again
                     C[-1]["content"] = C[-3]["content"]
-                elif isinstance(C[-3]["content"], list):
-                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
                 else:
-                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-3]["content"]
+                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
                 
 
         return C
@@ -407,13 +403,17 @@ class DRUGMachine(DRUGAgent):
             Tuple: prediction, explanation and updated context
         """
 
+        # copy the context to avoid modifying the original (reduntant but safer)
+        copied_C = deepcopy(C)
+
         # assemble prompt and ask LLM
         if is_prompt:
-            P_j = C
+            P_j = copied_C
         else:
-            P_j = self.assemble_prompt(x, C)
+            P_j = self.assemble_prompt(x, copied_C)
         response = self.llm(messages=P_j)
         try:
+            # recopy context to remove the query from the context
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
         except AssertionError as e:
@@ -496,14 +496,14 @@ class DRUGHumanStatic(DRUGAgent):
             Tuple: prediction, explanation and updated context
         """
         # current session & example
-        y_h, mol, e_h = x
+        y_h, _, e_h = x
 
         # add the human's response to the context
         human_response = {
             "role": "user",
             "content": f"""
             Prediction: {y_h}
-            Pathway: {mol}
+            Pathway: {e_h}
             """
         }
         C.append(human_response)
