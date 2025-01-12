@@ -1,4 +1,5 @@
 import os
+import re
 import pandas as pd
 from copy import deepcopy
 from abc import abstractmethod
@@ -438,6 +439,28 @@ class DRUG(Task):
 		super().__init__()
 
 	@staticmethod
+	def get_few_shot() -> str:
+		"""
+		This method loads a few examples of single-step retrosynthetic pathways.
+		"""
+		# load the few-shot examples
+		examples = pd.read_csv("data/few_shot_DRUG.csv")
+		few_shot = []
+		for _, row in examples.iterrows():
+			y = row["output"]
+			mol = row["input"]
+			e = row["explanation"]
+			prompt = f"""Generate a single-step retrosynthetic pathway for {mol}.
+
+					*Prediction: {y}*
+					*Pathway: {e}*
+					"""
+			few_shot.append(prompt)
+
+		few_shot = "\n\n".join(few_shot)
+		return few_shot
+
+	@staticmethod
 	def assemble_prompt(x, c_j) -> Prompt:
 		"""
 		Assemble prompt for the LLM.
@@ -450,16 +473,21 @@ class DRUG(Task):
 			Prompt: prompt
 		"""
 		_, mol, _ = x
+
+		# load few-shot examples
+		few_shot = DRUG.get_few_shot()
+
 		messages = [
 			{
 				"role": "system",
-				"content": """
-				You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
+				"content": f"""
+				You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
 				Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
-				It is also known that the user's predictions are always correct, i.e., ground truth.
+				Additionally, provide insight into the reasoning behind the proposed pathway, incorporating principles of organic chemistry,
+				synthetic strategy, and any relevant computational chemistry insights.
 
 				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: <smiles of retrosynthesis input>*
+				*Prediction: <SMILES of retrosynthesis input>*
 				*Pathway: <the retrosynthesis pathway described in text>*
 
 				If there are multiple input SMILES, separate them by a period '.'.
@@ -470,16 +498,20 @@ class DRUG(Task):
 				3. This conversation is ratified
 				and so on.
 				You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
-				the real task, i.e., retrosynthesis.
+				the real task, i.e., retrosynthesis. In this protocol the other agent (user) always provides correct retrosynthesis 
+				reactants (inputs).
+
+				A few examples of single-step retrosynthetic pathways are provided below:
+				{few_shot}
 				"""
 				},
 			{
-				"role": "system",
+				"role": "user",
 				"content": f"""
 				You have to predict a single step retrosynthetic pathway for {mol}.
 				"""
 				}
-		]
+			]
 		if c_j is None:
 			c_j = []
 
@@ -529,7 +561,7 @@ class DRUG(Task):
 		except Exception as e:
 			print(f"Exception: {e} while processing {y}: first SMILES string.")
 			y = None
-		
+
 		try:
 			pred = pred.split(".")
 			pred = [Chem.MolFromSmiles(mol) for mol in pred]
@@ -581,21 +613,27 @@ class DRUG(Task):
 				{
 					"role": "system",
 					"content": """
-					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
+					You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
 					Your role is to check consistency between two retrosynthesis pathways.
-					1. VERY IMPORTANT, your answer should be the same if the two explanations of the pathway are swapped, i.e., independent of the order.
-					2. Respond only in Yes OR No.
+					- Include considerations for regioselectivity, stereoselectivity, and functional group compatibility as applicable.
+					- Your analysis should focus on the chemical reactions and not the reactants, check if the descriptions describe similar reactions.
+					- Consider whether the reactions proceed through similar mechanistic pathways (e.g., SN2, E2, addition-elimination), even if different reagents are used.
+					- Evaluate if the protection/deprotection strategies, when present, serve similar purposes in both pathways.
+					- Generate *Judgement: Yes/No*.
 					"""
 					},
 				{
 					"role": "user",
-					"content": f"Given A: {e} is an explanation of a retrosynthesis pathway, and B: {e_pred} is another explanation of a retrosynthesis pathway, are these two consistent?"
+					"content": f"Given A: {e} is a retrosynthesis pathway, and B: {e_pred} is another retrosynthesis pathway, do these describe similar reactions?"
 					},
 				]
 			)
 
 		# parse the response
 		out = completion.choices[0].message.content.lower()
+		pattern = re.compile(r"judgement:\s*yes")
+		out = pattern.findall(out)
+		out = out[0] if len(out) > 0 else "no"
 		if "yes" in out:
 			return True
 		else:
@@ -678,7 +716,6 @@ class DRUG(Task):
 			context (Prompt): Current context for the model
 			test_df (pd.DataFrame): Test data
 			machine (Agent): The machine agent
-            x (Tuple): example of (y, mol, e)
 			set(str): which set the model is being evaluated on
 
 		Returns:
@@ -692,12 +729,13 @@ class DRUG(Task):
 		correct_preds = 0
 		correct_expls = 0
 		correct = 0
+		few_shot = DRUG.get_few_shot()
 
 		# iterate over the test data
 		for _, row in test_df.iterrows():
 			total += 1
-			y = row["input"]
-			mol = row["output"]
+			y = row["output"]
+			mol = row["input"]
 			e = row["explanation"]
 
 			x = (y, mol, e)
@@ -707,27 +745,32 @@ class DRUG(Task):
 			prompt.extend([
 				{
 					"role": "system",
-					"content": """
-					You are an expert in retrosynthesis with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures. 
-					Your role is to analyze the target molecule and suggest a viable retrosynthetic pathway.
+					"content": f"""
+					You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
+					Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
+					Additionally, provide insight into the reasoning behind the proposed pathway, incorporating principles of organic chemistry,
+					synthetic strategy, and any relevant computational chemistry insights.
 
 					You have to strictly adhere to the following format in your response, no extra text:
-					*Prediction: <smiles of retrosynthesis input>*
+					*Prediction: <SMILES of retrosynthesis input>*
 					*Pathway: <the retrosynthesis pathway described in text>*
 
 					If there are multiple input SMILES, separate them by a period '.'.
 
 					DO NOT GENERATE THESE PHRASES:
-					1. I made a mistake
-					2. You made a mistake
-					3. This conversation is ratified
+					- I made a mistake
+					- You made a mistake
+					- This conversation is ratified
 					and so on.
 					You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
 					the real task, i.e., retrosynthesis.
+
+					A few examples of single-step retrosynthetic pathways are provided below:
+					{few_shot}
 					"""
 					},
 				{
-					"role": "system",
+					"role": "user",
 					"content": f"""
 					You have to predict a single step retrosynthetic pathway for {mol}.
 					"""

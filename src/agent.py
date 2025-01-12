@@ -24,7 +24,7 @@ class Agent:
     def __init__(self, type: str, id: int):
         self.type = type
         self.id = id
-        self.performance = -1.0
+        self.performance = 0.0
         self.preds = -1.0
         self.expls = -1.0
 
@@ -509,6 +509,7 @@ class DRUGHumanStatic(DRUGAgent):
         C.append(human_response)
 
         return y_h, e_h, C
+
 
 """
 Factory method to create agents.

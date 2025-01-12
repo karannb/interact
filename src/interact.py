@@ -16,7 +16,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 			 human_type: str, eval_at_start: bool, task: str, 
 			 h: int, m: int, n: int, k: int = 3) -> List:
 	"""
-	Core interact function between the human and the machine.
+	Core function that simulates an interaction between the human and the machine.
 
 	Args:
 		train_data: Training data for the agent
@@ -111,14 +111,15 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 				f.write(f"sessionID-{sess}, mol-{label} ::: tags-{tags}\n")
 
 		# decide if the context is helpful
-		if learn_fn(C_, val_data, machine):
+		learnOK = learn_fn(C_, val_data, machine)
+		if learnOK:
 			C = C_
 
 		if (test_data is not None) and (l_m_revision):
 			if task == "RAD":
-				evaluate_fn(C, test_data, machine, ailment=label)
+				evaluate_fn(C_, test_data, machine, ailment=label)
 			elif task == "DRUG":
-				evaluate_fn(C, test_data, machine, set="TEST")
+				evaluate_fn(C_, test_data, machine, set="TEST")
 
 		# only check for ratify because, in this special case,
 		# human agent can never revise.
@@ -177,6 +178,9 @@ if __name__ == "__main__":
 	elif args.task == "DRUG":
 		data = pd.read_csv("data/retro_match_sorted.csv", index_col=None) # by default in y, x, e format, i.e. y ->^e x
 		data.drop(columns=["matchOK"], inplace=True)
+		# shuffle the data
+		data = data.sample(frac=1, random_state=42).reset_index(drop=True)
+		data = data[["output", "input", "explanation"]]
 		# split the data into train, val and test
 		total = len(data)
 		train_data = data[:int(total * 0.1)]
