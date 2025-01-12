@@ -9,12 +9,10 @@ from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
 
-from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(
-	organization=openai_org,
-	api_key=openai_key,
+from anthropic import Anthropic
+anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+client = Anthropic(
+    api_key=anthropic_key,
 )
 
 from typing import Tuple, List, Union, Dict, Optional
@@ -133,16 +131,6 @@ class RAD(Task):
 		encoded_img = encode_image(img)
 		messages = [
 			{
-				"role": "system",
-				"content": """
-				Pretend that you are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-				It is also known that the user's predictions are always correct, i.e., ground truth.
-				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: Yes/No*
-				*Explanation: <Your explanation here>*
-				"""
-				},
-			{
 				"role": "user",
 				"content": f"""
 				Given the following chest XRay, you have to predict the presence of {y}.
@@ -160,11 +148,21 @@ class RAD(Task):
 					]
 				}
 			]
+
+		# pass the system message separately to claude
+		system = """
+			Pretend that you are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+			It is also known that the user's predictions are always correct, i.e., ground truth.
+			You have to strictly adhere to the following format in your response, no extra text:
+			*Prediction: Yes/No*
+			*Explanation: <Your explanation here>*
+		"""
+
 		if c_j is None:
 			c_j = []
 
 		c_j += messages
-		return c_j
+		return c_j, system
 
 	@staticmethod
 	def learn(C: List, val_data: pd.DataFrame, machine, **kwargs) -> bool:
@@ -221,22 +219,19 @@ class RAD(Task):
 			bool: True if the explanation agrees with the prediction, False otherwise
 		"""
 		# NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-		completion = client.chat.completions.create(
-			model="gpt-4o",
+		completion = client.messages.create(
+			model="claude-3-opus-latest",
 			temperature=0.0,
-			seed=42,
+			system="""
+			You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+			Your task is to check consistency between two given diagnoses/explanations of an XRay.
+			1. Ignore any personal patient information mentioned in either diagnosis/explanation, e.g. age, name, etc.
+			2. Consider consistency in terms of the symptoms only and not the causes, e.g. if a report mentions xyz can be
+			diagnosed from follow-up and another report just mentions xyz, then this is no problem, it's not necessary to mention follow-up.
+			3. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.
+			4. Respond only in Yes/No.
+			""",
 			messages=[
-				{
-					"role": "system",
-					"content": """
-					You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-					Your task is to check consistency between two given diagnoses/explanations of an XRay.
-					1. Ignore any personal patient information mentioned in either diagnosis/explanation, e.g. age, name, etc.
-					2. Consider consistency in terms of the symptoms only and not the causes, e.g. if a report mentions xyz can be
-					diagnosed from follow-up and another report just mentions xyz, then this is no problem, it's not necessary to mention follow-up.
-					3. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.
-					4. Respond only in Yes/No."""
-				},
 				{
 					"role": "user",
 					"content": f"Given A: {e} is a diagnosis/explanation of an XRay, and B: {e_pred} is another diagnosis/explanation of an XRay, are these two consistent?"
@@ -461,7 +456,7 @@ class DRUG(Task):
 		return few_shot
 
 	@staticmethod
-	def assemble_prompt(x, c_j) -> Prompt:
+	def assemble_prompt(x, c_j) -> Tuple[Prompt, str]:
 		"""
 		Assemble prompt for the LLM.
 
@@ -479,44 +474,44 @@ class DRUG(Task):
 
 		messages = [
 			{
-				"role": "system",
-				"content": f"""
-				You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
-				Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
-				Additionally, provide insight into the reasoning behind the proposed pathway, incorporating principles of organic chemistry,
-				synthetic strategy, and any relevant computational chemistry insights.
-
-				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: <SMILES of retrosynthesis input>*
-				*Pathway: <the retrosynthesis pathway described in text>*
-
-				If there are multiple input SMILES, separate them by a period '.'.
-
-				DO NOT GENERATE THESE PHRASES:
-				1. I made a mistake
-				2. You made a mistake
-				3. This conversation is ratified
-				and so on.
-				You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
-				the real task, i.e., retrosynthesis. In this protocol the other agent (user) always provides correct retrosynthesis 
-				reactants (inputs).
-
-				A few examples of single-step retrosynthetic pathways are provided below:
-				{few_shot}
-				"""
-				},
-			{
 				"role": "user",
 				"content": f"""
 				You have to predict a single step retrosynthetic pathway for {mol}.
 				"""
 				}
 			]
+
+		# pass the system message separately to claude
+		system = f"""
+			You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
+			Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
+			Additionally, provide insight into the reasoning behind the proposed pathway, incorporating principles of organic chemistry,
+			synthetic strategy, and any relevant computational chemistry insights.
+
+			You have to strictly adhere to the following format in your response, no extra text:
+			*Prediction: <SMILES of retrosynthesis input>*
+			*Pathway: <the retrosynthesis pathway described in text>*
+
+			If there are multiple input SMILES, separate them by a period '.'.
+
+			DO NOT GENERATE THESE PHRASES:
+			1. I made a mistake
+			2. You made a mistake
+			3. This conversation is ratified
+			and so on.
+			You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
+			the real task, i.e., retrosynthesis. In this protocol the other agent (user) always provides correct retrosynthesis 
+			reactants (inputs).
+
+			A few examples of single-step retrosynthetic pathways are provided below:
+			{few_shot}
+		"""
+
 		if c_j is None:
 			c_j = []
 
 		c_j += messages
-		return c_j
+		return c_j, system
 
 	@staticmethod
 	def learn(C: List, val_data: pd.DataFrame, machine, **kwargs) -> bool:
@@ -605,23 +600,21 @@ class DRUG(Task):
 			bool: True if the explanation agrees with the prediction, False otherwise
 		"""
 		# NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-		completion = client.chat.completions.create(
-			model="gpt-4o",
+		completion = client.messages.create(
+			model="claude-3-opus-latest",
 			temperature=0.0,
-			seed=42,
+			max_tokens=10,
+			system="""
+			You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
+			Your role is to check consistency between two retrosynthesis pathways.
+			- Include considerations for regioselectivity, stereoselectivity, and functional group compatibility as applicable.
+			- Your analysis should focus on the chemical reactions and not the reactants, check if the descriptions describe similar reactions.
+			- Consider whether the reactions proceed through similar mechanistic pathways (e.g., SN2, E2, addition-elimination), even if different reagents are used.
+			- Evaluate if the protection/deprotection strategies, when present, serve similar purposes in both pathways.
+			- Generate only *Judgement: Yes/No*, do not include any other text. (Exactly as shown)
+			- Do generate a response even if the pathways are not similar.
+			""",
 			messages=[
-				{
-					"role": "system",
-					"content": """
-					You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
-					Your role is to check consistency between two retrosynthesis pathways.
-					- Include considerations for regioselectivity, stereoselectivity, and functional group compatibility as applicable.
-					- Your analysis should focus on the chemical reactions and not the reactants, check if the descriptions describe similar reactions.
-					- Consider whether the reactions proceed through similar mechanistic pathways (e.g., SN2, E2, addition-elimination), even if different reagents are used.
-					- Evaluate if the protection/deprotection strategies, when present, serve similar purposes in both pathways.
-					- Generate *Judgement: Yes/No*.
-					"""
-					},
 				{
 					"role": "user",
 					"content": f"Given A: {e} is a retrosynthesis pathway, and B: {e_pred} is another retrosynthesis pathway, do these describe similar reactions?"
@@ -630,7 +623,7 @@ class DRUG(Task):
 			)
 
 		# parse the response
-		out = completion.choices[0].message.content.lower()
+		out = completion.content[0].text.lower()
 		pattern = re.compile(r"judgement:\s*yes")
 		out = pattern.findall(out)
 		out = out[0] if len(out) > 0 else "no"
@@ -652,7 +645,7 @@ class DRUG(Task):
 			Tuple: prediction and explanation
 		"""
 		# parse LLM response
-		response = response.choices[0].message.content
+		response = response.content[0].text
 		pred_and_expl = response.split("\n")
 		prediction, explanation = "", ""
 		for text in pred_and_expl:
@@ -691,7 +684,7 @@ class DRUG(Task):
 		# extract explanation
 		if explanation != "":
 			assert "Pathway" in explanation, f"Pathway not found in the response, expected 'Pathway: <Your explanation here>', got {explanation}."
-			expl = explanation.split(":", 1)[1].strip()
+			expl = explanation.split(":", 1)[1].strip()[:-1] # remove the ending '*'
 		else:
 			expl = None
 

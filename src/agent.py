@@ -5,12 +5,10 @@ from abc import abstractmethod
 from tasks import RAD, DRUG
 
 import os
-from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(
-    organization=openai_org,
-    api_key=openai_key,
+from anthropic import Anthropic
+anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+client = Anthropic(
+    api_key=anthropic_key,
 )
 
 from typing import Tuple, List, Dict
@@ -225,10 +223,9 @@ class RADMachine(RADAgent):
     """
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o-mini",
-                           max_tokens=300,
-                           seed=42)
+        self.llm = partial(client.messages.create, 
+                           model="claude-3-opus-latest",
+                           max_tokens=300)
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -242,13 +239,19 @@ class RADMachine(RADAgent):
         Returns:
             Tuple: prediction, explanation and updated context
         """
+        # copy the context to avoid modifying the original (reduntant but safer)
+        copied_C = deepcopy(C)
 
         # assemble prompt and ask LLM
         if is_prompt:
-            P_j = C
+            assert copied_C[-2]["role"] == "system", f"Prompt should have a system message at -2, but got {copied_C[-2]['role']}"
+            system = copied_C[-2]["content"]
+            copied_C.pop(-2)
+            P_j = copied_C
         else:
-            P_j = self.assemble_prompt(x, C)
-        response = self.llm(messages=P_j)
+            P_j, system = self.assemble_prompt(x, C)
+        response = self.llm(messages=P_j,
+                            system=system)
 
         try:
             copied_C = deepcopy(C)
@@ -385,10 +388,9 @@ class DRUGMachine(DRUGAgent):
     """
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o",
-                           max_tokens=1024,
-                           seed=42)
+        self.llm = partial(client.messages.create, 
+                           model="claude-3-opus-latest",
+                           max_tokens=1024)
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -408,10 +410,14 @@ class DRUGMachine(DRUGAgent):
 
         # assemble prompt and ask LLM
         if is_prompt:
+            assert copied_C[-2]["role"] == "system", f"Prompt should have a system message at -2, but got {copied_C[-2]['role']}"
+            system = copied_C[-2]["content"]
+            copied_C.pop(-2)
             P_j = copied_C
         else:
-            P_j = self.assemble_prompt(x, copied_C)
-        response = self.llm(messages=P_j)
+            P_j, system = self.assemble_prompt(x, copied_C)
+        response = self.llm(messages=P_j,
+                            system=system)
         try:
             # recopy context to remove the query from the context
             copied_C = deepcopy(C)
