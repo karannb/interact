@@ -115,11 +115,11 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 		if learnOK:
 			C = C_
 
-		if (test_data is not None) and (l_m_revision):
+		if (test_data is not None) and (l_m_revision) and learnOK:
 			if task == "RAD":
-				evaluate_fn(C_, test_data, machine, ailment=label)
+				evaluate_fn(C, test_data, machine, ailment=label)
 			elif task == "DRUG":
-				evaluate_fn(C_, test_data, machine, set="TEST")
+				evaluate_fn(C, test_data, machine, set="TEST")
 
 		# only check for ratify because, in this special case,
 		# human agent can never revise.
