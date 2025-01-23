@@ -11,7 +11,7 @@ client = Anthropic(
     api_key=anthropic_key,
 )
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Callable
 
 
 class Agent:
@@ -22,13 +22,13 @@ class Agent:
     def __init__(self, type: str, id: int):
         self.type = type
         self.id = id
-        self.performance = 0.0
+        self.performance = -1.0
         self.preds = -1.0
         self.expls = -1.0
 
         # these are set in the subclasses
-        self.match = None
-        self.agree = None
+        self.match: Callable = None
+        self.agree: Callable = None
 
     def __call__(self, j: int, k: int, delta: Tuple) -> Tuple:
         """
@@ -170,34 +170,34 @@ class RADAgent(Agent):
         """
         if j == 1:
             # first messages are just information about the models
-            C[-1]["content"] = "This is my initial opinion on the X-Ray: " + C[-1]["content"]
+            C[-1]["content"] = "This is my initial diagnosis of the X-Ray: " + C[-1]["content"]
         elif j == 2:
             # need to handle human's first response specially.
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                C[-1]["content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+                C[-1]["content"] = "I think I made a mistake. I revise my diagnosis to: " + C[-1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
+                C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-1]["content"]
         else:
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                C[-1]["content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. My opinion on this XRay is: " + C[-1]["content"]
+                C[-1]["content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[-1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+                C[-1]["content"] = "I think I made a mistake. I revise my diagnosis to: " + C[-1]["content"]
             elif l_hat == "refute":
-                # because nothing changes, we send the same opinion again as 2 steps ago
+                # because nothing changes, we send the same diagnosis again as 2 steps ago
                 if "I think you made a mistake" in C[-3]["content"]:
-                    # if we had refuted two steps ago, we need to send the same opinion again
+                    # if we had refuted two steps ago, we need to send the same diagnosis again
                     # without the refutation added again
                     C[-1]["content"] = C[-3]["content"]
                 elif isinstance(C[-3]["content"], list):
-                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
+                    C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-1]["content"]
                 else:
-                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-3]["content"]
+                    C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-3]["content"]
 
         return C
 
@@ -249,7 +249,7 @@ class RADMachine(RADAgent):
             copied_C.pop(-2)
             P_j = copied_C
         else:
-            P_j, system = self.assemble_prompt(x, C)
+            P_j, system = self.assemble_prompt(x, copied_C)
         response = self.llm(messages=P_j,
                             system=system)
 
@@ -257,7 +257,9 @@ class RADMachine(RADAgent):
             copied_C = deepcopy(C)
             y_m, e_m, new_C = self.parse_response(response, copied_C)
         except AssertionError as e:
+            print()
             print(f"Problem {e} in response {response}, redoing...")
+            print()
             return "problem", -1, C
 
         # update context if the response is valid
@@ -293,7 +295,7 @@ class RADHuman(RADAgent):
         human_response = {
             "role": "user",
             "content": f"""
-            *Prediction: Yes*
+            *Prediction: {str(y).lower()}*
             *Explanation: {e}*
             """
         }

@@ -127,13 +127,35 @@ class RAD(Task):
 		Returns:
 			Prompt: prompt
 		"""
-		y, img, _ = x
+		_, img, _ = x
 		encoded_img = encode_image(img)
 		messages = [
 			{
+				"role": "system",
+				"content": """
+				You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+				1. Carefully analyze the provided chest X-ray image
+				2. Make a precise diagnosis for the specified condition
+				3. Provide a clear, evidence-based explanation for your prediction
+
+				You have to strictly adhere to the following format in your response, no extra text:
+				*Prediction: <ailment>*
+				*Explanation: <Your explanation here>*
+
+				DO NOT GENERATE THESE PHRASES:
+				- I made a mistake
+				- You made a mistake
+				- This conversation is ratified
+				You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
+				the real task, i.e., radiology diagnosis. In this protocol the other agent (user) always provides correct 
+				diagnosis/prediction.
+				"""
+				},
+			{
 				"role": "user",
 				"content": f"""
-				Given the following chest XRay, you have to predict the presence of {y}.
+				Given the following chest XRay, you have to predict the presence of one of the ailments: 
+				Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
 				"""
 				},
 			{
@@ -172,14 +194,11 @@ class RAD(Task):
 		Args:
 			C (List): context
 			machine (Agent): machine
-		kwargs:
-			ailment (str): ailment
 
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
-		print("The next evaluation call is from the learn function.")
-		new_performance = RAD.evaluate(C, val_data, machine, ailment = kwargs["ailment"])
+		new_performance = RAD.evaluate(C, val_data, machine, set="VAL")
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -201,7 +220,7 @@ class RAD(Task):
 		"""
 		pred = str(pred).lower()
 		y = str(y).lower()
-		if "yes" in pred or y == pred:
+		if y == pred or y in pred or pred in y:
 			return True
 		else:
 			return False
@@ -234,7 +253,7 @@ class RAD(Task):
 			messages=[
 				{
 					"role": "user",
-					"content": f"Given A: {e} is a diagnosis/explanation of an XRay, and B: {e_pred} is another diagnosis/explanation of an XRay, are these two consistent?"
+					"content": f"Given A: {e} is a explanation of an XRay, and B: {e_pred} is another explanation of an XRay, are these two consistent?"
 				},
 			]
 		)
@@ -260,6 +279,7 @@ class RAD(Task):
 		"""
 		response = response.choices[0].message.content
 		pred_and_expl = response.split("\n")
+		# extract prediction and explanation
 		prediction, explanation = "", ""
 		for text in pred_and_expl:
 			if "Prediction" in text:
@@ -268,13 +288,13 @@ class RAD(Task):
 				explanation = text
 		assert prediction != "" or explanation != "", "Prediction or Explanation not found in the response."
 		if prediction != "":
-			assert "Prediction" in prediction, "Prediction not found in the response, expected 'Prediction: Yes/No', got " + prediction
-			pred = prediction.split(":")[1].strip()
+			assert "Prediction" in prediction, f"Prediction not found in the response, expected 'Prediction: Yes/No', got {prediction}."
+			pred = prediction.split(":")[1].strip()[:-1] # remove the '*' at the end
 		else:
 			pred = None
 		if explanation != "":
 			assert "Explanation" in explanation, "Explanation not found in the response, expected 'Explanation: <Your explanation here>', got " + explanation
-			expl = explanation.split(":")[1].strip()
+			expl = explanation.split(":")[1].strip()[:-1] # remove the '*' at the end
 		else:
 			expl = None
 
@@ -305,7 +325,8 @@ class RAD(Task):
 		Returns:
 			float: The overall accuracy of the model
 		"""
-		print(f"Evaluating for {ailment}...")
+		set_name = kwargs.pop("set", None)
+		print(f"Evaluating on {set_name} set...")
 
 		# initialize the counters
 		total = 0
@@ -313,108 +334,34 @@ class RAD(Task):
 		correct_expls = 0
 		correct = 0
 
-		agree_fn = RAD.agree
-		ailment = kwargs.pop("ailment", None)
-		if ailment is None:
-			raise ValueError("Ailment not provided. Pass an ailment in the kwargs like ailment='Atelectasis'.")
-
-		# prediction prompt
-		pred_prompt = deepcopy(context)
-		pred_prompt.extend(
-		[
-			{
-				"role": "system",
-				"content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-				You have to strictly respond in (no extra text) :
-				*Prediction: Yes/No*
-				"""
-				},
-			{
-				"role": "user",
-				"content": f"Given the following chest XRay, you have to predict the presence of {ailment}."
-				}
-			]
-		)
-
-		expl_prompt = deepcopy(context)
-		expl_prompt.extend(
-		[
-			{
-				# TODO: check prompt
-				"role": "system",
-				"content": """You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-				You have to strictly response in, no extra text:
-				*Prediction: Yes*
-				*Explanation: <Your explanation here>*
-				"""
-				},
-			{
-				"role": "user",
-				"content": f"Given the following chest XRay, you have to explain the presence of {ailment}."
-				},
-			{
-				"role": "assistant",
-				"content": "*Prediction: Yes*"
-				}
-   			]
-		)
-
 		# iterate over the test data
 		for _, row in test_df.iterrows():
 			total += 1
-			report = row["report"]
-			label = row["label"]
-			img = encode_image(row["img_path"])
+			y = row["label"]
+			img = row["img_path"]
+			e = row["report"]
 
-			# get prediction
-			img_msg = {
-				"role": "user",
-				"content": [
-					{
-						"type": "image_url",
-						"image_url": {
-							"url": f"data:image/jpeg;base64,{img}"
-							}
-						}
-					]
-				}
+			x = (y, img, e)
 
-			# redo till we get a valid prediction
-			y = "problem"
-			while y == "problem":
-				y, _, _ = machine.ask(None, pred_prompt + [img_msg], is_prompt=True)
-				if y == "problem":
+			# get the prompt
+			prompt = deepcopy(context)
+			prompt = RAD.assemble_prompt(x, prompt)
+
+			# get output from the model
+			y_pred = "problem"
+			while y_pred == "problem":
+				y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
+				if y_pred == "problem":
 					print("Problem with prediction, retrying...")
 
-			prediction = y
-
-			# if label != ailment, we don't care about explanation, only prediction
-			if label != ailment:
-				matchOK = "no" in prediction.lower()
-				correct_preds += 1 if matchOK else 0
-				correct_expls += 1 if matchOK else 0
-				correct += 1 if matchOK else 0
-			else:
-				if "no" in prediction.lower():
-					# the ailment IS present, but the model predicted it as absent
-					pass
-				else:
-					# get explanation
-					y = "problem"
-					while y == "problem":
-						y, explanation, _ = machine.ask(None, expl_prompt + [img_msg], is_prompt=True)
-						if y == "problem":
-							print("Problem with explanation, retrying...")
-
-					# check if the prediction is correct
-					matchOK = "yes" in prediction.lower()
-					agreeOK = agree_fn(explanation, report)
-					correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
-					correct_expls += 1 if agreeOK else 0
-					correct += 1 if matchOK and agreeOK else 0
+			# check if the prediction is correct
+			matchOK = RAD.match(y, y_pred)
+			agreeOK = RAD.agree(e, e_pred)
+			correct_preds += 1 if matchOK else 0
+			correct_expls += 1 if agreeOK else 0
+			correct += 1 if matchOK and agreeOK else 0
 
 		# print the results
-		print(f"Ailment: {ailment}")
 		print(f"Total: {total}")
 		print(f"Correct Predictions: {correct_preds}")
 		print(f"Correct Explanations: {correct_expls}")
@@ -422,6 +369,23 @@ class RAD(Task):
 		print(f"Prediction Accuracy: {100*correct_preds / total:.2f}")
 		print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
 		print(f"Overall Accuracy: {100*correct / total:.2f}")
+
+		# log the results
+		log_str = f"""
+		***********************************************************
+		Accuracy on {set_name}
+		Total: {total}
+		Correct Predictions: {correct_preds}
+		Correct Explanations: {correct_expls}
+		Correct Overall: {correct}
+		Prediction Accuracy: {100*correct_preds / total:.2f}
+		Explanation Accuracy: {100*correct_expls / total:.2f}
+		Overall Accuracy: {100*correct / total:.2f}
+		***********************************************************
+		"""
+		f = open("results/accuracy_log.txt", "a+")
+		f.write(log_str)
+		f.close()
 
 		return correct / total
 
@@ -527,9 +491,7 @@ class DRUG(Task):
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
-		print("The next evaluation call is from the learn function.")
 		new_performance = DRUG.evaluate(C, val_data, machine, set="VAL")
-		
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -722,7 +684,6 @@ class DRUG(Task):
 		correct_preds = 0
 		correct_expls = 0
 		correct = 0
-		few_shot = DRUG.get_few_shot()
 
 		# iterate over the test data
 		for _, row in test_df.iterrows():
@@ -735,41 +696,7 @@ class DRUG(Task):
 
 			#pred+expl prompt
 			prompt = deepcopy(context)
-			prompt.extend([
-				{
-					"role": "system",
-					"content": f"""
-					You are a synthetic chemist with comprehensive knowledge of synthetic organic chemistry and established retrosynthetic procedures.
-					Your role is to analyze the target molecule and suggest viable a retrosynthetic pathway.
-					Additionally, provide insight into the reasoning behind the proposed pathway, incorporating principles of organic chemistry,
-					synthetic strategy, and any relevant computational chemistry insights.
-
-					You have to strictly adhere to the following format in your response, no extra text:
-					*Prediction: <SMILES of retrosynthesis input>*
-					*Pathway: <the retrosynthesis pathway described in text>*
-
-					If there are multiple input SMILES, separate them by a period '.'.
-
-					DO NOT GENERATE THESE PHRASES:
-					- I made a mistake
-					- You made a mistake
-					- This conversation is ratified
-					and so on.
-					You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
-					the real task, i.e., retrosynthesis.
-
-					A few examples of single-step retrosynthetic pathways are provided below:
-					{few_shot}
-					"""
-					},
-				{
-					"role": "user",
-					"content": f"""
-					You have to predict a single step retrosynthetic pathway for {mol}.
-					"""
-					}
-				]
-			)
+			prompt = DRUG.assemble_prompt(x, prompt)
 
 			# get prediction
 			y_pred = "problem"
@@ -795,6 +722,7 @@ class DRUG(Task):
 		print(f"Explanation Accuracy: {100*correct_expls / total:.2f}")
 		print(f"Overall Accuracy: {100*correct / total:.2f}")
 
+		# log the results
 		log_str = f"""
 		***********************************************************
 		Accuracy on {set_name}
@@ -807,8 +735,7 @@ class DRUG(Task):
 		Overall Accuracy: {100*correct / total:.2f}
 		***********************************************************
 		"""
-
-		f = open("results/accuracy_log.txt","a+")
+		f = open("results/accuracy_log.txt", "a+")
 		f.write(log_str)
 		f.close()
 

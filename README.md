@@ -23,15 +23,25 @@ To reproduce our RAD results, you can run the following command:
 ```bash
 python src/interact.py --num_iter=5
 ```
+
+To reproduce our DRUG results, you can run the following command:
+```bash
+python src/interact.py --task=DRUG --human_type=static --eval_at_start
+```
 This will output the counts of one-way and two-way intelligible sessions, create a `tags.txt` file of the actual tags exchanged between the two agents and also save the D (`data.pkl`), M (`messages.pkl`) and C (`context.pkl`) (from Procedure 1 in the paper) to the `results/` folder.
 To reproduce the trend in Figure 3 from the paper, we ran the above command 5 times and manually extracted how many one-way intelligible sessions (upto an interaction limit) were generated per agent.
 Reproducing the DRUG results requires an expert and so the outcome may be stochastic.
+
+### Selecting LLMs
+- The `main` branch runs the task with the OpenAI API, for running models such as `GPT-4o`
+- The `claude-port` branch will run the task with the Anthropic API, for running models such as `claude-3.5-sonnet`
 
 ### Static / Real-time feedback
 In general the code allows for interaction between both static and real-time human feedback and an LLM (interfaced by the `XMachine`).
 To use the approach with custom data, 
 - you can use some form of static human feedback (like RAD), stored in data as a CSV,
 - as with the DRUG task, one can create an analogous real-time feedback system, using the command line and a real expert human for feedback.
+- DRUG can also be run in static mode by passing `--human_type=static`
 
 ### How to use the code for a different task
 Here, we precisely describe how to use the code for a different task, say MATS (i.e. Materials Science).
