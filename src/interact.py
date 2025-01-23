@@ -11,8 +11,10 @@ from tasks import RAD, DRUG
 from agent import create_agent
 from argparse import ArgumentParser
 
+from typing import Optional
 
-def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame, 
+
+def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 
 			 human_type: str, eval_at_start: bool, task: str, 
 			 h: int, m: int, n: int, k: int = 3) -> List:
 	"""
@@ -21,7 +23,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 	Args:
 		train_data: Training data for the agent
 		val_data (pd.DataFrame): Validation data for the agent and task, used in learn
-		test_data (pd.DataFrame): Test data for the agent and task, used in evaluate
+		test_data (Optional, pd.DataFrame): Test data for the agent and task, used in evaluate
 		human_type (str): Type of human agent, either "real-time" or "static", Only used in DRUG task
 		eval_at_start (bool): Evaluate the agent at the start of the interaction to get base performance
 		task (str): Task to perform, either "RAD" or "DRUG"
@@ -51,12 +53,12 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 	# initial performance on the test data
 	if eval_at_start:
 		if test_data is None:
-			print("eval_at_start is set to True, but test_data is None.")
+			print("eval_at_start is set to True, but test_data is None. Continuing without evaluation...")
 		elif task == "RAD":
-			evaluate_fn([], test_data, machine, ailment="Pneumothorax")
+			print("We only support performance evaluation for DRUG, but got task RAD. Continuing without evaluation...")
 		elif task == "DRUG":
 			evaluate_fn([], test_data, machine, set="TEST_START")
-		print("Evaluation at start complete.")
+			print("Evaluation at start complete.")
 
 	# metrics
 	total_sessions = 0
@@ -116,10 +118,10 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 			C = C_
 
 		if (test_data is not None) and (l_m_revision) and learnOK:
-			if task == "RAD":
-				evaluate_fn(C, test_data, machine, ailment=label)
-			elif task == "DRUG":
+			if task == "DRUG":
 				evaluate_fn(C, test_data, machine, set="TEST")
+			else:
+				print(f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation...")
 
 		# only check for ratify because, in this special case,
 		# human agent can never revise.
@@ -138,10 +140,10 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: pd.DataFrame,
 
 	# final performance on the test data
 	if test_data is not None:
-		if task == "RAD":
-			evaluate_fn(C, test_data, machine, ailment=label)
-		elif task == "DRUG": 
+		if task == "DRUG":
 			evaluate_fn(C, test_data, machine, set="TEST_END")
+		else:
+			print(f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation...")
 
 	log_str = f"""
 	###################################
@@ -164,17 +166,19 @@ if __name__ == "__main__":
 	parser = ArgumentParser()
 	parser.add_argument("--n", "--num_iter", type=int, default=3)
 	parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
-	parser.add_argument("--ailment", type=str, default="Atelectasis")
 	parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time", "static"])
 	parser.add_argument("--eval_at_start", default=False, action="store_true", help="Evaluate the agent at the start of the interaction to get base performance.")
 	args = parser.parse_args()
 
 	if args.task == "RAD":
-		train_data = pd.read_csv(f"data/train/{args.ailment}.csv", index_col=None)
-		val_data = pd.read_csv(f"data/val/{args.ailment}.csv", index_col=None)
-		test_data = pd.read_csv(f"data/test/{args.ailment}.csv", index_col=None)
+		train_data = pd.read_csv("data/train_xray_data.csv", index_col=None)
+		val_data = pd.read_csv("data/val_xray_data.csv", index_col=None)
 		train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
-		test_data = test_data.drop(columns=["case", "label_short", "link"], inplace=False) if test_data is not None else None
+		val_data = val_data.drop(columns=["case", "label_short", "link"], inplace=False)
+		test_data = None
+		print("*"*50)
+		print("We do not have test data for the RAD task, and as such only report the intelligibility metrics.")
+		print("*"*50)
 	elif args.task == "DRUG":
 		data = pd.read_csv("data/retro_match_sorted.csv", index_col=None) # by default in y, x, e format, i.e. y ->^e x
 		data.drop(columns=["matchOK"], inplace=True)
@@ -189,7 +193,9 @@ if __name__ == "__main__":
 	else:
 		raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
 
-	open("results/accuracy_log.txt", "w").close() #erase file before every run
+	# create a new accuracy log file for each run
+	open("results/accuracy_log.txt", "w").close()
+
 	# Interact with the agents
 	iterdata = train_data.iterrows()
 	D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, 
