@@ -131,27 +131,6 @@ class RAD(Task):
 		encoded_img = encode_image(img)
 		messages = [
 			{
-				"role": "system",
-				"content": """
-				You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-				1. Carefully analyze the provided chest X-ray image
-				2. Make a precise diagnosis for the specified condition
-				3. Provide a clear, evidence-based explanation for your prediction
-
-				You have to strictly adhere to the following format in your response, no extra text:
-				*Prediction: <ailment>*
-				*Explanation: <Your explanation here>*
-
-				DO NOT GENERATE THESE PHRASES:
-				- I made a mistake
-				- You made a mistake
-				- This conversation is ratified
-				You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
-				the real task, i.e., radiology diagnosis. In this protocol the other agent (user) always provides correct 
-				diagnosis/prediction.
-				"""
-				},
-			{
 				"role": "user",
 				"content": f"""
 				Given the following chest XRay, you have to predict the presence of one of the ailments: 
@@ -162,9 +141,11 @@ class RAD(Task):
 				"role": "user",
 				"content": [
 					{
-						"type": "image_url",
-						"image_url": {
-							"url": f"data:image/jpeg;base64,{encoded_img}"
+						"type": "image",
+						"source": {
+							"type": "base64",
+							"media_type": f"image/{img.split('.')[-1]}",
+							"data": encoded_img
 							}
 						}
 					]
@@ -173,11 +154,22 @@ class RAD(Task):
 
 		# pass the system message separately to claude
 		system = """
-			Pretend that you are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-			It is also known that the user's predictions are always correct, i.e., ground truth.
+			You are a helpful radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
+			1. Carefully analyze the provided chest X-ray image
+			2. Make a precise diagnosis for the specified condition
+			3. Provide a clear, evidence-based explanation for your prediction
+
 			You have to strictly adhere to the following format in your response, no extra text:
-			*Prediction: Yes/No*
+			*Prediction: <ailment>*
 			*Explanation: <Your explanation here>*
+
+			DO NOT GENERATE THESE PHRASES:
+			- I made a mistake
+			- You made a mistake
+			- This conversation is ratified
+			You are an agent taking part in a protocol which automatically adds these filler messages, you have to focus
+			the real task, i.e., radiology diagnosis. In this protocol the other agent (user) always provides correct 
+			diagnosis/prediction.
 		"""
 
 		if c_j is None:
@@ -243,12 +235,10 @@ class RAD(Task):
 			temperature=0.0,
 			system="""
 			You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
-			Your task is to check consistency between two given diagnoses/explanations of an XRay.
-			1. Ignore any personal patient information mentioned in either diagnosis/explanation, e.g. age, name, etc.
-			2. Consider consistency in terms of the symptoms only and not the causes, e.g. if a report mentions xyz can be
-			diagnosed from follow-up and another report just mentions xyz, then this is no problem, it's not necessary to mention follow-up.
-			3. VERY IMPORTANT, your answer should be the same if the two reports are swapped, i.e., independent of the order of the two reports.
-			4. Respond only in Yes/No.
+			Your task is to check consistency between two given explanations of XRay diagnoses.
+			- Ignore any personal patient information mentioned in either diagnosis/explanation, e.g. age, name, etc.
+			- Consider consistency in terms of the symptoms only and not the causes.
+			- Respond only in Yes/No.
 			""",
 			messages=[
 				{
@@ -345,12 +335,12 @@ class RAD(Task):
 
 			# get the prompt
 			prompt = deepcopy(context)
-			prompt = RAD.assemble_prompt(x, prompt)
+			prompt, system = RAD.assemble_prompt(x, prompt)
 
 			# get output from the model
 			y_pred = "problem"
 			while y_pred == "problem":
-				y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
+				y_pred, e_pred, _ = machine.ask(x, [prompt, system], is_prompt=True)
 				if y_pred == "problem":
 					print("Problem with prediction, retrying...")
 
@@ -696,12 +686,12 @@ class DRUG(Task):
 
 			#pred+expl prompt
 			prompt = deepcopy(context)
-			prompt = DRUG.assemble_prompt(x, prompt)
+			prompt, system = DRUG.assemble_prompt(x, prompt)
 
 			# get prediction
 			y_pred = "problem"
 			while y_pred == "problem":
-				y_pred, e_pred, _ = machine.ask(x, prompt, is_prompt=True)
+				y_pred, e_pred, _ = machine.ask(x, [prompt, system], is_prompt=True)
 				if y_pred == "problem":
 					print("Problem with prediction, retrying...")
 

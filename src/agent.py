@@ -244,10 +244,8 @@ class RADMachine(RADAgent):
 
         # assemble prompt and ask LLM
         if is_prompt:
-            assert copied_C[-2]["role"] == "system", f"Prompt should have a system message at -2, but got {copied_C[-2]['role']}"
-            system = copied_C[-2]["content"]
-            copied_C.pop(-2)
-            P_j = copied_C
+            assert len(copied_C) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
+            P_j, system = copied_C # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
         else:
             P_j, system = self.assemble_prompt(x, copied_C)
         response = self.llm(messages=P_j,
@@ -412,14 +410,13 @@ class DRUGMachine(DRUGAgent):
 
         # assemble prompt and ask LLM
         if is_prompt:
-            assert copied_C[-2]["role"] == "system", f"Prompt should have a system message at -2, but got {copied_C[-2]['role']}"
-            system = copied_C[-2]["content"]
-            copied_C.pop(-2)
-            P_j = copied_C
+            assert len(copied_C) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
+            P_j, system = copied_C # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
         else:
             P_j, system = self.assemble_prompt(x, copied_C)
         response = self.llm(messages=P_j,
                             system=system)
+
         try:
             # recopy context to remove the query from the context
             copied_C = deepcopy(C)
