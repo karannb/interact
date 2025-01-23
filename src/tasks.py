@@ -129,6 +129,13 @@ class RAD(Task):
 		"""
 		_, img, _ = x
 		encoded_img = encode_image(img)
+
+		# extension is needed for claude API
+		extension = img.split('.')[-1]
+		if extension == "jpg":
+			extension = "jpeg"
+
+		# messages to be sent to the LLM
 		messages = [
 			{
 				"role": "user",
@@ -144,7 +151,7 @@ class RAD(Task):
 						"type": "image",
 						"source": {
 							"type": "base64",
-							"media_type": f"image/{img.split('.')[-1]}",
+							"media_type": f"image/{extension}",
 							"data": encoded_img
 							}
 						}
@@ -233,6 +240,7 @@ class RAD(Task):
 		completion = client.messages.create(
 			model="claude-3-opus-latest",
 			temperature=0.0,
+			max_tokens=10,
 			system="""
 			You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax.
 			Your task is to check consistency between two given explanations of XRay diagnoses.
@@ -249,7 +257,7 @@ class RAD(Task):
 		)
 
 		# parse the response
-		out = completion.choices[0].message.content.lower()
+		out = completion.content[0].text.lower()
 		if "yes" in out:
 			return True
 		else:
@@ -267,7 +275,7 @@ class RAD(Task):
 		Returns:
 			Tuple: prediction and explanation
 		"""
-		response = response.choices[0].message.content
+		response = response.content[0].text
 		pred_and_expl = response.split("\n")
 		# extract prediction and explanation
 		prediction, explanation = "", ""
