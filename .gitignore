@@ -3,3 +3,5 @@ data/
 results/
 tags*.txt
 __pycache__/
+.venv/
+.conda/
