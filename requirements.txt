@@ -3,3 +3,6 @@ openai==1.52.0
 pandas==2.2.0
 rdkit==2023.03.1
 tqdm==4.66.3
+python-dotenv
+anthropic
+pyarrow
