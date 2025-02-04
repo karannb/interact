@@ -3,6 +3,7 @@ from functools import partial
 from abc import abstractmethod
 
 from tasks import RAD, DRUG
+from utils import draw_smiles
 
 import os
 from anthropic import Anthropic
@@ -12,6 +13,8 @@ client = Anthropic(
 )
 
 from typing import Tuple, List, Dict, Callable
+from tasks import Prompt
+from variables import bcolors
 
 
 class Agent:
@@ -441,7 +444,7 @@ class DRUGHuman(DRUGAgent):
     def __init__(self, id: int):
         super().__init__("Human", id)
 
-    def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
+    def ask(self, x: Tuple, C: Prompt, is_prompt: bool = False) -> Tuple:
         """
         Ask a Human for a response on the Command Line.
 
@@ -455,22 +458,46 @@ class DRUGHuman(DRUGAgent):
         Returns:
             Tuple: prediction, explanation and updated context
         """
+        _, mol, _ = x
+        print("*"*10)
+        print(f"The molecule: {mol}")
+        print("*"*10)
         # show the current conversation
         for c in C:
             print("*"*20)
-            print(c["role"])
+            # change color based on the role
+            if c["role"] == "assistant":
+                print(bcolors.OKGREEN + c["role"].capitalize() + bcolors.ENDC)
+            else:
+                print(bcolors.OKBLUE + c["role"].capitalize() + bcolors.ENDC)
             print("*"*20)
-            print(c["content"])
+            content = c["content"].replace("*", "")
+            try:
+                pre_prediction = content.split("Prediction:")[0].strip()
+                print(pre_prediction)
+                prediction = content.split("Prediction:")[1].split("Pathway:")[0].strip()
+                print("\n" + bcolors.WARNING + "Prediction: " + bcolors.ENDC + prediction.strip("*"))
+                pathway = content.split("Pathway:")[1].strip()
+                print(bcolors.WARNING + "Pathway: " + bcolors.ENDC + pathway)
+            except:
+                print(content)
 
         # current session & example
-        _, mol, _ = x
-        print(f"The molecule: {mol}")
+        
+        print("*"*20)
+        print(bcolors.OKBLUE + "human".capitalize() + bcolors.ENDC)
+        print("*"*20)
+        try:
+            mol_to_print =  prediction.strip("*") + ">>" + mol 
+            draw_smiles(mol_to_print)
+        except:
+            draw_smiles(mol, reaction=False)
 
         # take prediction input from the user
         # this is necessary because there can be multiple pathways
         done_with_prediction = False
         while not done_with_prediction:
-            y_h = input("Prediction: ")
+            y_h = input(bcolors.WARNING + "Prediction: " + bcolors.ENDC)
             safety = input("Are you sure about this prediction? ([y]/n): ")
             if safety == "y" or safety == "" or safety.lower() == "y":
                 done_with_prediction = True
@@ -478,7 +505,7 @@ class DRUGHuman(DRUGAgent):
         # ask for explanation
         done_with_explanation = False
         while not done_with_explanation:
-            e_h = input("Explanation: ")
+            e_h = input(bcolors.WARNING + "Explanation: " + bcolors.ENDC)
             safety = input("Are you sure about this explanation? ([y]/n): ")
             if safety == "y" or safety == "" or safety.lower() == "y":
                 done_with_explanation = True
