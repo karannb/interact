@@ -7,10 +7,9 @@ from utils import draw_smiles
 
 import os
 from anthropic import Anthropic
+
 anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-client = Anthropic(
-    api_key=anthropic_key,
-)
+client = Anthropic(api_key=anthropic_key, )
 
 from typing import Tuple, List, Dict, Callable
 from tasks import Prompt
@@ -22,6 +21,7 @@ class Agent:
     Generic class for agents,
     which can be either a human or a machine.
     """
+
     def __init__(self, type: str, id: int):
         self.type = type
         self.id = id
@@ -45,12 +45,12 @@ class Agent:
         Returns:
             Tuple: response (tag, pred, expl)
         """
-        D, M, C = delta # we don't need to set C_0 = None, because that's already done.
+        D, M, C = delta  # we don't need to set C_0 = None, because that's already done.
 
         # current session & example
         x, sess = D[-1]
 
-        # ask the agent, the "problem" part is needed to 
+        # ask the agent, the "problem" part is needed to
         # handle the case when the response is invalid
         # for the machine agent
         y_hat = "problem"
@@ -59,27 +59,28 @@ class Agent:
 
         # check if we have crossed 2 interactions
         if j >= 2:
-            _, yp, ep = M[-1][3] # message from prev agent
+            _, yp, ep = M[-1][3]  # message from prev agent
             if j == 2:
                 ypp, epp = y_hat, e_hat
             else:
-                _, ypp, epp = M[-2][3] # message from prev prev agent
+                _, ypp, epp = M[-2][3]  # message from prev prev agent
             # now check for categories
-            if j % 2 == 0: # human
+            if j % 2 == 0:  # human
                 # we decide to put the ground truth first
                 # and then the prediction / generation
                 matchOK = self.match(ypp, yp)
                 agreeOK = self.agree(epp, ep)
-            else: # machine
+            else:  # machine
                 matchOK = self.match(yp, ypp)
                 agreeOK = self.agree(ep, epp)
             catA = matchOK and agreeOK
             catB = matchOK and not agreeOK
             catC = not matchOK and agreeOK
             catD = not matchOK and not agreeOK
-            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat))
+            change = (not self.match(ypp, y_hat)) or (not self.agree(
+                epp, e_hat))
 
-            # because change is an approximate test, we make sure that the there are no 
+            # because change is an approximate test, we make sure that the there are no
             # ambiguities by manually resetting y_hat and e_hat to 2 turns ago
             if not change:
                 y_hat, e_hat = ypp, epp
@@ -109,7 +110,8 @@ class Agent:
         return (l_hat, y_hat, e_hat), C
 
     @abstractmethod
-    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+    def update_context(self, C: List[Dict], x: Tuple, l_hat,
+                       j: int) -> List[Dict]:
         """
         Updates context, i.e. the conversation to make it more conversation-like.
 
@@ -149,6 +151,7 @@ class RADAgent(Agent):
     """
     Agent class for the RAD task.
     """
+
     def __init__(self, type: str, id: int):
         super().__init__(type, id)
 
@@ -158,7 +161,8 @@ class RADAgent(Agent):
         self.match = RAD.match
         self.agree = RAD.agree
 
-    def update_context(self, C: List[Dict], x: Tuple, l_hat: str, j: int) -> List[Dict]:
+    def update_context(self, C: List[Dict], x: Tuple, l_hat: str,
+                       j: int) -> List[Dict]:
         """
         Updates context, i.e. the conversation to make it more conversation-like.
 
@@ -173,24 +177,38 @@ class RADAgent(Agent):
         """
         if j == 1:
             # first messages are just information about the models
-            C[-1]["content"] = "This is my initial diagnosis of the X-Ray: " + C[-1]["content"]
+            C[-1][
+                "content"] = "This is my initial diagnosis of the X-Ray: " + C[
+                    -1]["content"]
         elif j == 2:
             # need to handle human's first response specially.
             if l_hat == "ratify":
-                C[-1]["content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
+                C[-1][
+                    "content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[
+                        -1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my diagnosis to: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think I made a mistake. I revise my diagnosis to: " + C[
+                        -1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[
+                        -1]["content"]
         else:
             if l_hat == "ratify":
-                C[-1]["content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
+                C[-1][
+                    "content"] = "Our diagnoses match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I disagree with you and reject your diagnosis. My diagnosis of this XRay is: " + C[
+                        -1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my diagnosis to: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think I made a mistake. I revise my diagnosis to: " + C[
+                        -1]["content"]
             elif l_hat == "refute":
                 # because nothing changes, we send the same diagnosis again as 2 steps ago
                 if "I think you made a mistake" in C[-3]["content"]:
@@ -198,9 +216,13 @@ class RADAgent(Agent):
                     # without the refutation added again
                     C[-1]["content"] = C[-3]["content"]
                 elif isinstance(C[-3]["content"], list):
-                    C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-1]["content"]
+                    C[-1][
+                        "content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[
+                            -1]["content"]
                 else:
-                    C[-1]["content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[-3]["content"]
+                    C[-1][
+                        "content"] = "I think you made a mistake. I refute your diagnosis. I think: " + C[
+                            -3]["content"]
 
         return C
 
@@ -224,9 +246,10 @@ class RADMachine(RADAgent):
     """
     Machine agent class.
     """
+
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.messages.create, 
+        self.llm = partial(client.messages.create,
                            model="claude-3-opus-latest",
                            max_tokens=300)
 
@@ -247,12 +270,13 @@ class RADMachine(RADAgent):
 
         # assemble prompt and ask LLM
         if is_prompt:
-            assert len(copied_C) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
-            P_j, system = copied_C # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
+            assert len(
+                copied_C
+            ) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
+            P_j, system = copied_C  # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
         else:
             P_j, system = self.assemble_prompt(x, copied_C)
-        response = self.llm(messages=P_j,
-                            system=system)
+        response = self.llm(messages=P_j, system=system)
 
         try:
             copied_C = deepcopy(C)
@@ -274,6 +298,7 @@ class RADHuman(RADAgent):
     """
     Human agent class.
     """
+
     def __init__(self, id: int):
         super().__init__("Human", id)
 
@@ -294,8 +319,10 @@ class RADHuman(RADAgent):
 
         # add the human's response to the context
         human_response = {
-            "role": "user",
-            "content": f"""
+            "role":
+            "user",
+            "content":
+            f"""
             *Prediction: {str(y).lower()}*
             *Explanation: {e}*
             """
@@ -314,6 +341,7 @@ class DRUGAgent(Agent):
     """
     Agent class for the DRUG task.
     """
+
     def __init__(self, type: str, id: int):
         super().__init__(type, id)
 
@@ -323,7 +351,8 @@ class DRUGAgent(Agent):
         self.match = DRUG.match
         self.agree = DRUG.agree
 
-    def update_context(self, C: List[Dict], x: Tuple, l_hat, j: int) -> List[Dict]:
+    def update_context(self, C: List[Dict], x: Tuple, l_hat,
+                       j: int) -> List[Dict]:
         """
         Updates context, i.e. the conversation to make it more conversation-like.
 
@@ -339,24 +368,38 @@ class DRUGAgent(Agent):
 
         if j == 1:
             # first messages are just information about the models
-            C[-1]["content"] = "This is the preliminary retrosynthesis pathway I propose: " + C[-1]["content"]
+            C[-1][
+                "content"] = "This is the preliminary retrosynthesis pathway I propose: " + C[
+                    -1]["content"]
         elif j == 2:
             # need to handle human's first response specially.
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                C[-1][
+                    "content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[
+                        -1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think I made a mistake. I revise my opinion to: " + C[
+                        -1]["content"]
             elif l_hat == "refute":
-                C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think you made a mistake. I refute your opinion. I think: " + C[
+                        -1]["content"]
         else:
             if l_hat == "ratify":
-                C[-1]["content"] = "Our opinions match. I agree with you. This conversation is ratified. "
+                C[-1][
+                    "content"] = "Our opinions match. I agree with you. This conversation is ratified. "
             elif l_hat == "reject":
-                C[-1]["content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I disagree with you and reject your opinion. I think the retrosynthesis pathway is: " + C[
+                        -1]["content"]
             elif l_hat == "revise":
-                C[-1]["content"] = "I think I made a mistake. I revise my opinion to: " + C[-1]["content"]
+                C[-1][
+                    "content"] = "I think I made a mistake. I revise my opinion to: " + C[
+                        -1]["content"]
             elif l_hat == "refute":
                 # because nothing changes, we send the same opinion again as 2 steps ago
                 if "I think you made a mistake" in C[-3]["content"]:
@@ -364,8 +407,9 @@ class DRUGAgent(Agent):
                     # without the refutation added again
                     C[-1]["content"] = C[-3]["content"]
                 else:
-                    C[-1]["content"] = "I think you made a mistake. I refute your opinion. I think: " + C[-1]["content"]
-                
+                    C[-1][
+                        "content"] = "I think you made a mistake. I refute your opinion. I think: " + C[
+                            -1]["content"]
 
         return C
 
@@ -389,9 +433,10 @@ class DRUGMachine(DRUGAgent):
     """
     Machine agent class.
     """
+
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.messages.create, 
+        self.llm = partial(client.messages.create,
                            model="claude-3-opus-latest",
                            max_tokens=1024)
 
@@ -413,12 +458,13 @@ class DRUGMachine(DRUGAgent):
 
         # assemble prompt and ask LLM
         if is_prompt:
-            assert len(copied_C) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
-            P_j, system = copied_C # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
+            assert len(
+                copied_C
+            ) == 2, f"Prompt should be passed as a list of 2 messages [context, system], but got {len(copied_C)}."
+            P_j, system = copied_C  # note: this is slightly erroneous and will lead to a faulty `new_C` in the end, but it will not be used as is_prompt is True
         else:
             P_j, system = self.assemble_prompt(x, copied_C)
-        response = self.llm(messages=P_j,
-                            system=system)
+        response = self.llm(messages=P_j, system=system)
 
         try:
             # recopy context to remove the query from the context
@@ -435,12 +481,13 @@ class DRUGMachine(DRUGAgent):
             C = new_C
 
         return y_m, e_m, C
-    
+
 
 class DRUGHuman(DRUGAgent):
     """
     Human agent that interacts using a CLI (Command Line Interface).
     """
+
     def __init__(self, id: int):
         super().__init__("Human", id)
 
@@ -459,36 +506,38 @@ class DRUGHuman(DRUGAgent):
             Tuple: prediction, explanation and updated context
         """
         _, mol, _ = x
-        print("*"*10)
+        print("*" * 10)
         print(f"The molecule: {mol}")
-        print("*"*10)
+        print("*" * 10)
         # show the current conversation
         for c in C:
-            print("*"*20)
+            print("*" * 20)
             # change color based on the role
             if c["role"] == "assistant":
                 print(bcolors.OKGREEN + c["role"].capitalize() + bcolors.ENDC)
             else:
                 print(bcolors.OKBLUE + c["role"].capitalize() + bcolors.ENDC)
-            print("*"*20)
+            print("*" * 20)
             content = c["content"].replace("*", "")
             try:
                 pre_prediction = content.split("Prediction:")[0].strip()
                 print(pre_prediction)
-                prediction = content.split("Prediction:")[1].split("Pathway:")[0].strip()
-                print("\n" + bcolors.WARNING + "Prediction: " + bcolors.ENDC + prediction.strip("*"))
+                prediction = content.split("Prediction:")[1].split(
+                    "Pathway:")[0].strip()
+                print("\n" + bcolors.WARNING + "Prediction: " + bcolors.ENDC +
+                      prediction.strip("*"))
                 pathway = content.split("Pathway:")[1].strip()
                 print(bcolors.WARNING + "Pathway: " + bcolors.ENDC + pathway)
             except:
                 print(content)
 
         # current session & example
-        
-        print("*"*20)
+
+        print("*" * 20)
         print(bcolors.OKBLUE + "human".capitalize() + bcolors.ENDC)
-        print("*"*20)
+        print("*" * 20)
         try:
-            mol_to_print =  prediction.strip("*") + ">>" + mol 
+            mol_to_print = prediction.strip("*") + ">>" + mol
             draw_smiles(mol_to_print)
         except:
             draw_smiles(mol, reaction=False)
@@ -512,8 +561,10 @@ class DRUGHuman(DRUGAgent):
 
         # add the human's response to the context
         human_response = {
-            "role": "user",
-            "content": f"""
+            "role":
+            "user",
+            "content":
+            f"""
             Prediction: {y_h}
             Pathway: {e_h}
             """
@@ -527,6 +578,7 @@ class DRUGHumanStatic(DRUGAgent):
     """
     Human agent class.
     """
+
     def __init__(self, id: int):
         super().__init__("Human", id)
 
@@ -547,8 +599,10 @@ class DRUGHumanStatic(DRUGAgent):
 
         # add the human's response to the context
         human_response = {
-            "role": "user",
-            "content": f"""
+            "role":
+            "user",
+            "content":
+            f"""
             Prediction: {y_h}
             Pathway: {e_h}
             """
@@ -561,6 +615,8 @@ class DRUGHumanStatic(DRUGAgent):
 """
 Factory method to create agents.
 """
+
+
 def create_agent(task: str, type: str, human_type: str, id: int):
     """
     Factory method to create agents.

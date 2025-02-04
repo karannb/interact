@@ -1,22 +1,22 @@
 import os
 import base64
+from typing import List, Union, Dict
 from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem import rdChemReactions as Reactions
 import matplotlib.pyplot as plt
-
+from openai import OpenAI
 from dotenv import load_dotenv
+from variables import RAD_SUMMARIZE_SYS_PROMPT, RAD_SUMMARIZE_USER_PROMPT
 load_dotenv()
 
-from openai import OpenAI
 openai_org = os.getenv("OPENAI_ORG")
 openai_key = os.getenv("OPENAI_KEY")
 client = OpenAI(
-	organization=openai_org,
-	api_key=openai_key,
+    organization=openai_org,
+    api_key=openai_key,
 )
 
-from typing import List, Union, Dict
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
@@ -43,31 +43,26 @@ def summarize(report: str, ailment: str) -> str:
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
         seed=42,
-        messages=[
-            {
-                "role": "system", 
-                "content": "You are a radiology expert, with detailed knowledge of Atelectasis, Pneumonia, Pleural Effusion, Cardiomegaly, Pneumothorax."
-                },
-            {
-                "role": "user",
-                "content": "Summarize the given radiology report in context of " 
-                + ailment + 
-                ". Also, you must (requirement) omit information about the patient age, name, as well as any links. You can also skip the 'report by' information, basically anything not related to the ailment."
-                + " Only include information that explicitly mentions the ailment or is close to such a mention."
-                + " Strictly do not write 'summary' anywhere, i.e., summarize the report as if you are generating it."
-                + " The report is as follows: "
-                },
-            {
-                "role": "user",
-                "content": report
-                }
-            ]
-        )
+        messages=[{
+            "role":
+            "system",
+            "content": RAD_SUMMARIZE_SYS_PROMPT
+            
+        }, {
+            "role":
+            "user",
+            "content": RAD_SUMMARIZE_USER_PROMPT.format(ailment=ailment)
+            
+        }, {
+            "role": "user",
+            "content": report
+        }])
 
     # parse the response
     summary = completion.choices[0].message.content
 
     return summary
+
 
 def draw_smiles(smiles, reaction=True):
     # Convert SMILES to a molecule object
@@ -75,11 +70,11 @@ def draw_smiles(smiles, reaction=True):
         mol = Reactions.ReactionFromSmarts(smiles, useSmiles=True)
     except:
         mol = Chem.MolFromSmiles(smiles)
-    
+
     if mol is None:
         print("Invalid SMILES string")
         return
-    
+
     # Draw the molecule and display it
     if reaction:
         img = Draw.ReactionToImage(mol)

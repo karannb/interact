@@ -1,22 +1,29 @@
 import sys
-sys.path.append("./")
-
 import os
 import uuid
 import pickle
-import pandas as pd
-from typing import List
+from typing import List, Optional
 from copy import deepcopy
+from argparse import ArgumentParser
+import pandas as pd
+
+sys.path.append("./")
+
 from tasks import RAD, DRUG
 from agent import create_agent
-from argparse import ArgumentParser
-
-from typing import Optional
 
 
-def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 
-            human_type: str, eval_at_start: bool, no_learn: bool, task: str, 
-            h: int, m: int, n: int, k: int = 3) -> List:
+def Interact(train_data,
+             val_data: pd.DataFrame,
+             test_data: Optional[pd.DataFrame],
+             human_type: str,
+             eval_at_start: bool,
+             no_learn: bool,
+             task: str,
+             h: int,
+             m: int,
+             n: int,
+             k: int = 3) -> List:
     """
     Core function that simulates an interaction between the human and the machine.
 
@@ -38,13 +45,14 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 
     # Initialize the relational databases
     D, M, C = [], [], None
-    n *= 2 # number of interactions need to be doubled 
-    n += 1 # and 1 is added because the first interaction is "initialization"
+    n *= 2  # number of interactions need to be doubled
+    n += 1  # and 1 is added because the first interaction is "initialization"
 
     # Initialize the agents
-    assert task in ["RAD", "DRUG"], f"Invalid task, expected 'RAD' or 'DRUG', got {task}."
+    assert task in ["RAD", "DRUG"
+                    ], f"Invalid task, expected 'RAD' or 'DRUG', got {task}."
     human = create_agent(task, "Human", human_type, h)
-    machine = create_agent(task, "Machine",human_type, m)
+    machine = create_agent(task, "Machine", human_type, m)
 
     # Select the task-specific functions
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
@@ -53,9 +61,13 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
     # initial performance on the test data
     if eval_at_start:
         if test_data is None:
-            print("eval_at_start is set to True, but test_data is None. Continuing without evaluation...")
+            print(
+                "eval_at_start is set to True, but test_data is None. Continuing without evaluation..."
+            )
         elif task == "RAD":
-            print("We only support performance evaluation for DRUG, but got task RAD. Continuing without evaluation...")
+            print(
+                "We only support performance evaluation for DRUG, but got task RAD. Continuing without evaluation..."
+            )
         elif task == "DRUG":
             evaluate_fn([], test_data, machine, set="TEST_START")
             print("Evaluation at start complete.")
@@ -81,11 +93,12 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
         done = False
         human_ratified, machine_ratified = False, False
 
-        C_ = deepcopy(C) # copy the context so we don't modify the original
+        C_ = deepcopy(C)  # copy the context so we don't modify the original
 
         while not done:
             # ask the machine
-            mu_m, C_ = machine(j, k, (D, M, C_)) # (tag, pred, expl) and context
+            mu_m, C_ = machine(j, k,
+                               (D, M, C_))  # (tag, pred, expl) and context
             M += [(sess, j, m, mu_m, h)]
             j += 1
             if mu_m[0] == "revise":
@@ -97,12 +110,15 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 
             if not done:
                 # ask the human
-                mu_h, C_ = human(j, k, (D, M, C_)) # (tag, pred, expl) and context
+                mu_h, C_ = human(j, k,
+                                 (D, M, C_))  # (tag, pred, expl) and context
                 M += [(sess, j, h, mu_h, m)]
                 j += 1
                 human_ratified = (mu_h[0] == "ratify") or human_ratified
                 # stopping condition
-                done = (j > n) or (human_ratified and machine_ratified) or (mu_h[0] == "reject")
+                done = (j > n) or (human_ratified
+                                   and machine_ratified) or (mu_h[0]
+                                                             == "reject")
                 tags.extend([f"Human: {mu_h[0]}"])
 
         # store the tags
@@ -115,10 +131,10 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
         # decide if the context is helpful
         if no_learn:
             learnOK = l_m_revision
-            
+
         else:
             learnOK = learn_fn(C_, val_data, machine)
-        
+
         if learnOK:
             C = C_
         else:
@@ -128,7 +144,9 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
             if task == "DRUG":
                 evaluate_fn(C, test_data, machine, set="TEST")
             else:
-                print(f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation...")
+                print(
+                    f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation..."
+                )
 
         # only check for ratify because, in this special case,
         # human agent can never revise.
@@ -150,7 +168,9 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
         if task == "DRUG":
             evaluate_fn(C, test_data, machine, set="TEST_END")
         else:
-            print(f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation...")
+            print(
+                f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation..."
+            )
 
     log_str = f"""
     ###################################
@@ -161,7 +181,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
     Two-way: {two_way}
     """
 
-    f = open("results/accuracy_log.txt","a+")
+    f = open("results/accuracy_log.txt", "a+")
     f.write(log_str)
     f.close()
 
@@ -172,23 +192,44 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument("--n", "--num_iter", type=int, default=3)
-    parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
-    parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time", "static"])
-    parser.add_argument("--eval_at_start", default=False, action="store_true", help="Evaluate the agent at the start of the interaction to get base performance.")
-    parser.add_argument("--no_learn", default=False, action="store_true", help="Flag to decide to use learn or not.")
+    parser.add_argument("--task",
+                        type=str,
+                        default="RAD",
+                        choices=["RAD", "DRUG"])
+    parser.add_argument("--human_type",
+                        type=str,
+                        default="real-time",
+                        choices=["real-time", "static"])
+    parser.add_argument(
+        "--eval_at_start",
+        default=False,
+        action="store_true",
+        help=
+        "Evaluate the agent at the start of the interaction to get base performance."
+    )
+    parser.add_argument("--no_learn",
+                        default=False,
+                        action="store_true",
+                        help="Flag to decide to use learn or not.")
     args = parser.parse_args()
 
     if args.task == "RAD":
         train_data = pd.read_csv("data/train_xray_data.csv", index_col=None)
         val_data = pd.read_csv("data/val_xray_data.csv", index_col=None)
-        train_data = train_data.drop(columns=["case", "label_short", "link"], inplace=False)
-        val_data = val_data.drop(columns=["case", "label_short", "link"], inplace=False)
+        train_data = train_data.drop(columns=["case", "label_short", "link"],
+                                     inplace=False)
+        val_data = val_data.drop(columns=["case", "label_short", "link"],
+                                 inplace=False)
         test_data = None
-        print("*"*50)
-        print("We do not have test data for the RAD task, and as such only report the intelligibility metrics.")
-        print("*"*50)
+        print("*" * 50)
+        print(
+            "We do not have test data for the RAD task, and as such only report the intelligibility metrics."
+        )
+        print("*" * 50)
     elif args.task == "DRUG":
-        data = pd.read_csv("data/retro_match_sorted.csv", index_col=None) # by default in y, x, e format, i.e. y ->^e x
+        data = pd.read_csv(
+            "data/retro_match_sorted.csv",
+            index_col=None)  # by default in y, x, e format, i.e. y ->^e x
         data.drop(columns=["matchOK"], inplace=True)
         # shuffle the data
         data = data.sample(frac=1, random_state=42).reset_index(drop=True)
@@ -196,18 +237,27 @@ if __name__ == "__main__":
         # split the data into train, val and test
         total = len(data)
         train_data = data[:int(total * 0.1)]
-        val_data = data[int(total * 0.6) : int(total * 0.8)]
-        test_data = data[int(total * 0.8) :]
+        val_data = data[int(total * 0.6):int(total * 0.8)]
+        test_data = data[int(total * 0.8):]
     else:
-        raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " + args.task)
+        raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " +
+                         args.task)
 
     # create a new accuracy log file for each run
     open("results/accuracy_log.txt", "w").close()
 
     # Interact with the agents
     iterdata = train_data.iterrows()
-    D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, 
-                    eval_at_start=args.eval_at_start, task=args.task, h=1, m=2, n=args.n, no_learn=args.no_learn)
+    D, M, C = Interact(iterdata,
+                       val_data,
+                       test_data,
+                       human_type=args.human_type,
+                       eval_at_start=args.eval_at_start,
+                       task=args.task,
+                       h=1,
+                       m=2,
+                       n=args.n,
+                       no_learn=args.no_learn)
 
     # save the relational databases
     if not os.path.exists("results"):

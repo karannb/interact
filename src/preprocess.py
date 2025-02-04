@@ -4,6 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils import summarize
 
+
 def preprocess(counts=4):
     """
     This is a simple function to retain data used for the project.
@@ -11,13 +12,20 @@ def preprocess(counts=4):
     """
 
     data = pd.read_csv("data/xray_data.csv")
-    data.drop(["Unnamed: 0", "certainty", "diagnosis", "desc_pth"], axis=1, inplace=True)
-    unique_ailements = ["Atelectasis", "Pneumonia", "Pleural Effusion", "Cardiomegaly", "Pneumothorax"]
+    data.drop(["Unnamed: 0", "certainty", "diagnosis", "desc_pth"],
+              axis=1,
+              inplace=True)
+    unique_ailements = [
+        "Atelectasis", "Pneumonia", "Pleural Effusion", "Cardiomegaly",
+        "Pneumothorax"
+    ]
     unique_counts = {ail: 0 for ail in unique_ailements}
     idx2keep = []
 
     # first find indices to keep
-    for _, row in tqdm(data.iterrows(), desc="Finding indices to keep...", total=len(data)):
+    for _, row in tqdm(data.iterrows(),
+                       desc="Finding indices to keep...",
+                       total=len(data)):
         labels = row["label"].split(",")
         labels = [label.strip() for label in labels]
         if len(labels) == 1:
@@ -30,7 +38,9 @@ def preprocess(counts=4):
     print(len(data))
 
     # now we iterate over again, and change the img_dir and summarize the reports
-    for idx, row in tqdm(data.iterrows(), desc="Processing data...", total=len(data)):
+    for idx, row in tqdm(data.iterrows(),
+                         desc="Processing data...",
+                         total=len(data)):
         try:
             img_dir = "data/" + row["img_dir"]
             img = img_dir + "/" + os.listdir(img_dir)[0]
