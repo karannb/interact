@@ -6,3 +6,4 @@ tqdm==4.66.3
 python-dotenv
 anthropic
 pyarrow
+matplotlib

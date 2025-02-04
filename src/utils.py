@@ -1,5 +1,9 @@
 import os
 import base64
+from rdkit import Chem
+from rdkit.Chem import Draw
+from rdkit.Chem import rdChemReactions as Reactions
+import matplotlib.pyplot as plt
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -64,3 +68,23 @@ def summarize(report: str, ailment: str) -> str:
     summary = completion.choices[0].message.content
 
     return summary
+
+def draw_smiles(smiles, reaction=True):
+    # Convert SMILES to a molecule object
+    try:
+        mol = Reactions.ReactionFromSmarts(smiles, useSmiles=True)
+    except:
+        mol = Chem.MolFromSmiles(smiles)
+    
+    if mol is None:
+        print("Invalid SMILES string")
+        return
+    
+    # Draw the molecule and display it
+    if reaction:
+        img = Draw.ReactionToImage(mol)
+    else:
+        img = Draw.MolToImage(mol)
+    plt.imshow(img)
+    plt.axis('off')  # Hide axes
+    plt.show()
