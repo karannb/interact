@@ -460,7 +460,7 @@ class DRUGHuman(DRUGAgent):
             print(c["role"] + ": " + c["content"])
 
         # current session & example
-        _, mol = x
+        y_h, mol, e_h = x
         print(f"The molecule: {mol}")
 
         # take prediction input from the user
