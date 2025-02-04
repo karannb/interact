@@ -1,5 +1,5 @@
 data/
-*temp*
+*temp/
 results/
 tags*.txt
 __pycache__/
