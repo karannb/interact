@@ -473,8 +473,10 @@ class DRUGHuman(DRUGAgent):
         # add the human's response to the context
         human_response = {
             "role": "user",
-            "content": f"""*Prediction: {y_h}*
-            *Explanation: {e_h}*"""
+            "content": f"""
+            Prediction: {y_h}
+            Pathway: {e_h}
+            """
         }
         C.append(human_response)
 
