@@ -1,6 +1,9 @@
 import os
 import base64
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from openai import OpenAI
 openai_org = os.getenv("OPENAI_ORG")
 openai_key = os.getenv("OPENAI_KEY")
