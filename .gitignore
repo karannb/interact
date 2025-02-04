@@ -5,3 +5,4 @@ tags*.txt
 __pycache__/
 .venv/
 .conda/
+.env
