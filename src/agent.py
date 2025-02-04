@@ -456,24 +456,40 @@ class DRUGHuman(DRUGAgent):
         """
         # show the current conversation
         for c in C:
-            print(c["role"] + ": " + c["content"])
+            print("*"*20)
+            print(c["role"])
+            print("*"*20)
+            print(c["content"])
 
         # current session & example
-        _, mol = x
+        _, mol, _ = x
         print(f"The molecule: {mol}")
 
         # take prediction input from the user
         # this is necessary because there can be multiple pathways
-        y_h = input("Prediction: ")
+        done_with_prediction = False
+        while not done_with_prediction:
+            y_h = input("Prediction: ")
+            safety = input(f"Are you sure about your prediction {y_h}? ([y]/n): ")
+            if safety == "y" or safety.lower() == "y" or safety == "":
+                done_with_prediction = True
 
         # ask for explanation
+        done_with_explanation = False
         e_h = input("Explanation: ")
+        while not done_with_explanation:
+            e_h = input("Explanation: ")
+            safety = input("Are you sure about your explanation? ([y]/n): ")
+            if safety == "y" or safety.lower() == "y" or safety == "":
+                done_with_explanation = True
 
         # add the human's response to the context
         human_response = {
             "role": "user",
-            "content": f"""*Prediction: {y_h}*
-            *Explanation: {e_h}*"""
+            "content": f"""
+            Prediction: {y_h}
+            Pathway: {e_h}
+            """
         }
         C.append(human_response)
 
