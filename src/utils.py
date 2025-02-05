@@ -5,11 +5,17 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem import rdChemReactions as Reactions
 import matplotlib.pyplot as plt
-from litellm import completion
+from openai import OpenAI
 from dotenv import load_dotenv
 from variables import RAD_SUMMARIZE_SYS_PROMPT, RAD_SUMMARIZE_USER_PROMPT
 load_dotenv()
 
+openai_org = os.getenv("OPENAI_ORG")
+openai_key = os.getenv("OPENAI_KEY")
+client = OpenAI(
+    organization=openai_org,
+    api_key=openai_key,
+)
 
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
@@ -34,7 +40,7 @@ def summarize(report: str, ailment: str) -> str:
         str: The summary of the report
     """
     # NOTE: for this task, 3.5 is just as good as any advanced model
-    respoonse = completion(
+    completion = client.chat.completions.create(
         model="gpt-3.5-turbo-0125",
         seed=42,
         messages=[{
@@ -53,7 +59,7 @@ def summarize(report: str, ailment: str) -> str:
         }])
 
     # parse the response
-    summary = respoonse.choices[0].message.content
+    summary = completion.choices[0].message.content
 
     return summary
 

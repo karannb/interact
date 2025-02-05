@@ -7,4 +7,3 @@ python-dotenv
 anthropic
 pyarrow
 matplotlib
-litellm
