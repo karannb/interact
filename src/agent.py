@@ -1,19 +1,19 @@
+import os
 from copy import deepcopy
 from functools import partial
 from abc import abstractmethod
+from typing import Tuple, List, Dict, Callable
+from litellm import completion
 
+from tasks import Prompt
+from variables import bcolors
 from tasks import RAD, DRUG
 from utils import draw_smiles
 
-import os
-from anthropic import Anthropic
 
-anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-client = Anthropic(api_key=anthropic_key, )
 
-from typing import Tuple, List, Dict, Callable
-from tasks import Prompt
-from variables import bcolors
+
+
 
 
 class Agent:
@@ -249,7 +249,7 @@ class RADMachine(RADAgent):
 
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.messages.create,
+        self.llm = partial(completion,
                            model="claude-3-opus-latest",
                            max_tokens=300)
 
@@ -436,7 +436,7 @@ class DRUGMachine(DRUGAgent):
 
     def __init__(self, id: int):
         super().__init__("Machine", id)
-        self.llm = partial(client.messages.create,
+        self.llm = partial(completion,
                            model="claude-3-opus-latest",
                            max_tokens=1024)
 

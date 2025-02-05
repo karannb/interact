@@ -9,13 +9,11 @@ from typing import Tuple, List, Union, Dict, Optional
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
-from anthropic import Anthropic
+from litellm import completion
 
 from variables import RAD_ASSEMBLE_SYS_PROMPT, RAD_ASSEMBLE_USER_PROMPT, RAD_AGREE_SYS_PROMPT
 from variables import DRUG_ASSEMBLE_SYS_PROMPT, DRUG_ASSEMBLE_USER_PROMPT, DRUG_AGREE_SYS_PROMPT
 
-anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-client = Anthropic(api_key=anthropic_key, )
 
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
@@ -141,10 +139,8 @@ class RAD(Task):
 
         # messages to be sent to the LLM
         messages = [{
-            "role":
-            "user",
+            "role": "user",
             "content": RAD_ASSEMBLE_USER_PROMPT
-            
         }, {
             "role":
             "user",
@@ -219,12 +215,15 @@ class RAD(Task):
             bool: True if the explanation agrees with the prediction, False otherwise
         """
         # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-        completion = client.messages.create(
+        response = completion(
             model="claude-3-opus-latest",
             temperature=0.0,
             max_tokens=10,
-            system=RAD_AGREE_SYS_PROMPT,
             messages=[
+                {
+                    "role": "system",
+                    "content": RAD_AGREE_SYS_PROMPT
+                },
                 {
                     "role":
                     "user",
@@ -234,7 +233,7 @@ class RAD(Task):
             ])
 
         # parse the response
-        out = completion.content[0].text.lower()
+        out = response.choices[0].message.content.lower()
         if "yes" in out:
             return True
         else:
@@ -414,8 +413,7 @@ class DRUG(Task):
         few_shot = DRUG.get_few_shot()
 
         messages = [{
-            "role":
-            "user",
+            "role": "user",
             "content": DRUG_ASSEMBLE_USER_PROMPT.format(mol=mol)
         }]
 
@@ -523,12 +521,15 @@ class DRUG(Task):
             bool: True if the explanation agrees with the prediction, False otherwise
         """
         # NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-        completion = client.messages.create(
+        response = completion(
             model="claude-3-opus-latest",
             temperature=0.0,
             max_tokens=10,
-            system=DRUG_AGREE_SYS_PROMPT,
             messages=[
+                {
+                    "role": "system",
+                    "content": DRUG_AGREE_SYS_PROMPT
+                },
                 {
                     "role":
                     "user",
@@ -538,7 +539,7 @@ class DRUG(Task):
             ])
 
         # parse the response
-        out = completion.content[0].text.lower()
+        out = response.choices[0].message.content.lower()
         pattern = re.compile(r"judgement:\s*yes")
         out = pattern.findall(out)
         out = out[0] if len(out) > 0 else "no"
