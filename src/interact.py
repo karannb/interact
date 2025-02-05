@@ -114,8 +114,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 
         # decide if the context is helpful
         if no_learn:
-            learnOK = l_m_revision
-            
+            learnOK = True
         else:
             learnOK = learn_fn(C_, val_data, machine)
         
