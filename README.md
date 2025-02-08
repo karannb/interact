@@ -11,6 +11,11 @@ pip install -r requirements.txt
 You might want to create a virtual environment (or use conda) to avoid conflicts with your system packages.
 We use **python3.9.18** for all experiments.
 
+You will also have to create a results folder,
+```bash
+mkdir results
+```
+
 ### Data
 For the RAD task, please write to Prof. Sidong Liu [[email](mailto:sidong.liu@mq.edu.au)].
 For the DRUG task, please write to Shreyas V [[email](mailto:shreyas.college@gmail.com)].

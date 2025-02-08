@@ -1,5 +1,6 @@
 numpy==1.26.3
 openai==1.52.0
 pandas==2.2.0
-rdkit==2023.03.1
+rdkit==2023.3.1
 tqdm==4.66.3
+anthropic==0.23.1

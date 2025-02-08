@@ -1,5 +1,23 @@
 import os
 import base64
+import matplotlib.pyplot as plt
+
+from rdkit import Chem
+from rdkit.Chem import Draw
+from rdkit.Chem import rdChemReactions as Reactions
+
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 
 from openai import OpenAI
 openai_org = os.getenv("OPENAI_ORG")
@@ -61,3 +79,34 @@ def summarize(report: str, ailment: str) -> str:
     summary = completion.choices[0].message.content
 
     return summary
+
+
+def draw_smiles(smiles: str, reaction: bool = True):
+    """
+    Simple utility to draw a molecule (or reaction) from a SMILES string.
+
+    Args:
+        smiles (str): The SMILES string to draw
+        reaction (bool): Whether the SMILES string represents a reaction or not
+
+    Returns:
+        None: Plots the molecule (or reaction) using matplotlib
+    """
+    # Convert SMILES to a molecule object
+    try:
+        mol = Reactions.ReactionFromSmarts(smiles, useSmiles=True)
+    except:
+        mol = Chem.MolFromSmiles(smiles)
+    
+    if mol is None:
+        print("Invalid SMILES string")
+        return
+    
+    # Draw the molecule and display it
+    if reaction:
+        img = Draw.ReactionToImage(mol)
+    else:
+        img = Draw.MolToImage(mol)
+    plt.imshow(img)
+    plt.axis('off')  # Hide axes
+    plt.show()

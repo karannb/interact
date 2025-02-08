@@ -15,7 +15,7 @@ from typing import Optional
 
 
 def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 
-			 human_type: str, eval_at_start: bool, task: str, 
+			 human_type: str, eval_at_start: bool, no_learn: bool, task: str, 
 			 h: int, m: int, n: int, k: int = 3) -> List:
 	"""
 	Core function that simulates an interaction between the human and the machine.
@@ -26,6 +26,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		test_data (Optional, pd.DataFrame): Test data for the agent and task, used in evaluate
 		human_type (str): Type of human agent, either "real-time" or "static", Only used in DRUG task
 		eval_at_start (bool): Evaluate the agent at the start of the interaction to get base performance
+		no_learn (bool): If True, the agent will always add a session to the context
 		task (str): Task to perform, either "RAD" or "DRUG"
 		h (int): human-identifier
 		m (int): machine-identifier
@@ -113,9 +114,15 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 				f.write(f"sessionID-{sess}, mol-{label} ::: tags-{tags}\n")
 
 		# decide if the context is helpful
-		learnOK = learn_fn(C_, val_data, machine)
+		if no_learn:
+			learnOK = True
+		else:
+			learnOK = learn_fn(C_, val_data, machine)
+
 		if learnOK:
 			C = C_
+		else:
+			print("Session not helpful, not adding to the context.")
 
 		if (test_data is not None) and (l_m_revision) and learnOK:
 			if task == "DRUG":
@@ -168,6 +175,7 @@ if __name__ == "__main__":
 	parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
 	parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time", "static"])
 	parser.add_argument("--eval_at_start", default=False, action="store_true", help="Evaluate the agent at the start of the interaction to get base performance.")
+	parser.add_argument("--no_learn", default=False, action="store_true", help="Flag to decide to use learn or not.")
 	args = parser.parse_args()
 
 	if args.task == "RAD":
@@ -199,7 +207,8 @@ if __name__ == "__main__":
 	# Interact with the agents
 	iterdata = train_data.iterrows()
 	D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, 
-					   eval_at_start=args.eval_at_start, task=args.task, h=1, m=2, n=args.n)
+					   eval_at_start=args.eval_at_start, task=args.task, h=1, m=2, 
+					   n=args.n, no_learn=args.no_learn)
 
 	# save the relational databases
 	if not os.path.exists("results"):

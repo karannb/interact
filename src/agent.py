@@ -3,6 +3,7 @@ from functools import partial
 from abc import abstractmethod
 
 from tasks import RAD, DRUG
+from utils import bcolors, draw_smiles
 
 import os
 from openai import OpenAI
@@ -454,33 +455,56 @@ class DRUGHuman(DRUGAgent):
         Returns:
             Tuple: prediction, explanation and updated context
         """
-        # show the current conversation
-        for c in C:
-            print("*"*20)
-            print(c["role"])
-            print("*"*20)
-            print(c["content"])
-
         # current session & example
         _, mol, _ = x
+        print("*"*10)
         print(f"The molecule: {mol}")
+        print("*"*10)
+
+        # show the current conversation (pretty print)
+        for c in C:
+            print("*"*20)
+            if c["role"] == "assistant":
+                print(bcolors.OKGREEN + c["role"].capitalize() + bcolors.ENDC)
+            else:
+                print(bcolors.OKBLUE + c["role"].capitalize() + bcolors.ENDC)
+            print("*"*20)
+            content = c["content"].replace("*", "")
+            try:
+                pre_prediction = content.split("Prediction:")[0].strip()
+                print(pre_prediction)
+                prediction = content.split("Prediction:")[1].split("Pathway:")[0].strip()
+                print("\n" + bcolors.WARNING + "Prediction: " + bcolors.ENDC + prediction.strip("*"))
+                pathway = content.split("Pathway:")[1].strip()
+                print(bcolors.WARNING + "Pathway: " + bcolors.ENDC + pathway)
+            except:
+                print(content)
+
+        print("*"*20)
+        print(bcolors.OKBLUE + "human".capitalize() + bcolors.ENDC)
+        print("*"*20)
+        try:
+            # try to print the reaction
+            mol_to_print =  prediction.strip("*") + ">>" + mol 
+            draw_smiles(mol_to_print)
+        except:
+            # if the prediction is not available, print the molecules
+            draw_smiles(mol, reaction=False)
 
         # take prediction input from the user
-        # this is necessary because there can be multiple pathways
         done_with_prediction = False
         while not done_with_prediction:
-            y_h = input("Prediction: ")
-            safety = input(f"Are you sure about your prediction {y_h}? ([y]/n): ")
-            if safety == "y" or safety.lower() == "y" or safety == "":
+            y_h = input(bcolors.WARNING + "Prediction: " + bcolors.ENDC)
+            safety = input("Are you sure about this prediction? ([y]/n): ")
+            if safety == "y" or safety == "" or safety.lower() == "y":
                 done_with_prediction = True
 
         # ask for explanation
         done_with_explanation = False
-        e_h = input("Explanation: ")
         while not done_with_explanation:
-            e_h = input("Explanation: ")
-            safety = input("Are you sure about your explanation? ([y]/n): ")
-            if safety == "y" or safety.lower() == "y" or safety == "":
+            e_h = input(bcolors.WARNING + "Explanation: " + bcolors.ENDC)
+            safety = input("Are you sure about this explanation? ([y]/n): ")
+            if safety == "y" or safety == "" or safety.lower() == "y":
                 done_with_explanation = True
 
         # add the human's response to the context
