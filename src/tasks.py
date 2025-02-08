@@ -1,5 +1,5 @@
-import os
 import re
+import litellm
 import pandas as pd
 from copy import deepcopy
 from abc import abstractmethod
@@ -8,14 +8,6 @@ from utils import encode_image
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
-
-from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(
-	organization=openai_org,
-	api_key=openai_key,
-)
 
 from typing import Tuple, List, Union, Dict, Optional
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
@@ -66,13 +58,14 @@ class Task:
 		raise NotImplementedError("Subclass must implement abstract method.")
 
 	@abstractmethod
-	def agree(e, e_pred) -> bool:
+	def agree(e, e_pred, model: str) -> bool:
 		"""
 		Check if the explanation agrees with the prediction.
 
 		Args:
 			e: explanation
 			e_pred: explanation
+			model (str): The LLM model to use for agreement
 
 		Returns:
 			bool: True if the explanation agrees with the prediction, False otherwise
@@ -190,7 +183,7 @@ class RAD(Task):
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
-		new_performance = RAD.evaluate(C, val_data, machine, set="VAL")
+		new_performance = RAD.evaluate(C, val_data, machine, set="VAL", **kwargs)
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -218,7 +211,7 @@ class RAD(Task):
 			return False
 
 	@staticmethod
-	def agree(e, e_pred) -> bool:
+	def agree(e, e_pred, model: str = "gpt-4o") -> bool:
 		"""
 		Check if the explanation agrees with the prediction.
 
@@ -230,8 +223,8 @@ class RAD(Task):
 			bool: True if the explanation agrees with the prediction, False otherwise
 		"""
 		# NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-		completion = client.chat.completions.create(
-			model="gpt-4o",
+		completion = litellm.completion(
+			model=model,
 			temperature=0.0,
 			seed=42,
 			messages=[
@@ -321,6 +314,8 @@ class RAD(Task):
 		"""
 		set_name = kwargs.pop("set", None)
 		print(f"Evaluating on {set_name} set...")
+		evaluator_llm = kwargs.pop("evaluator_llm", None)
+		assert evaluator_llm is not None, "Evaluator LLM not provided."
 
 		# initialize the counters
 		total = 0
@@ -350,7 +345,7 @@ class RAD(Task):
 
 			# check if the prediction is correct
 			matchOK = RAD.match(y, y_pred)
-			agreeOK = RAD.agree(e, e_pred)
+			agreeOK = RAD.agree(e, e_pred, evaluator_llm)
 			correct_preds += 1 if matchOK else 0
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0
@@ -485,7 +480,7 @@ class DRUG(Task):
 		Returns:
 			bool: True if the performance is improved, False otherwise
 		"""
-		new_performance = DRUG.evaluate(C, val_data, machine, set="VAL")
+		new_performance = DRUG.evaluate(C, val_data, machine, set="VAL", **kwargs)
 		# return true if the performance is improved
 		if machine.performance <= new_performance:
 			machine.performance = new_performance
@@ -544,7 +539,7 @@ class DRUG(Task):
 			return False
 
 	@staticmethod
-	def agree(e, e_pred) -> bool:
+	def agree(e, e_pred, model: str = "gpt-4o") -> bool:
 		"""
 		Check if the explanation agrees with the prediction.
 
@@ -556,8 +551,8 @@ class DRUG(Task):
 			bool: True if the explanation agrees with the prediction, False otherwise
 		"""
 		# NOTE: for this task, we need to use GPT-4, 3.5 is not enough
-		completion = client.chat.completions.create(
-			model="gpt-4o",
+		completion = litellm.completion(
+			model=model,
 			temperature=0.0,
 			seed=42,
 			messages=[
@@ -674,6 +669,8 @@ class DRUG(Task):
 		"""
 		set_name = kwargs.pop("set", None)
 		print(f"Evaluating on {set_name} set...")
+		evaluator_llm = kwargs.pop("evaluator_llm", None)
+		assert evaluator_llm is not None, "Evaluator LLM not provided."
 
 		# initialize the counters
 		total = 0
@@ -703,7 +700,7 @@ class DRUG(Task):
 
 			# check if the prediction is correct
 			matchOK = DRUG.match(y, y_pred)
-			agreeOK = DRUG.agree(e, e_pred)
+			agreeOK = DRUG.agree(e, e_pred, evaluator_llm)
 			correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0

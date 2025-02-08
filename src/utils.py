@@ -1,5 +1,6 @@
-import os
 import base64
+import litellm
+import argparse
 import matplotlib.pyplot as plt
 
 from rdkit import Chem
@@ -18,14 +19,6 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-
-from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(
-	organization=openai_org,
-	api_key=openai_key,
-)
 
 from typing import List, Union, Dict
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
@@ -51,7 +44,7 @@ def summarize(report: str, ailment: str) -> str:
         str: The summary of the report
     """
     # NOTE: for this task, 3.5 is just as good as any advanced model
-    completion = client.chat.completions.create(
+    completion = litellm.completion(
         model="gpt-3.5-turbo-0125",
         seed=42,
         messages=[
@@ -110,3 +103,119 @@ def draw_smiles(smiles: str, reaction: bool = True):
     plt.imshow(img)
     plt.axis('off')  # Hide axes
     plt.show()
+
+
+def parse_args():
+    """
+    Parse command line arguments for the interaction system.
+    
+    Returns:
+        argparse.Namespace: Parsed command-line arguments
+    """
+    parser = argparse.ArgumentParser(description="Configuration for interactive learning system")
+    
+    # Core parameters
+    parser.add_argument(
+        "--n", "--num_iter",
+        type=int,
+        default=3,
+        help="Number of iterations for the interaction loop"
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default="RAD",
+        choices=["RAD", "DRUG"],
+        help="Task type to perform: RAD (Radiology) or DRUG (Retrosynthesis)."
+    )
+    parser.add_argument(
+        "--machine",
+        type=str,
+        required=True,
+        default="gpt-4o",
+        choices=[
+            "gpt-4o",
+            "gpt-4o-mini",
+            "claude-3-5-sonnet-20240620",
+            "claude-3-sonnet-20240229"
+        ],
+        help="Language model to use for the interaction"
+    )
+    parser.add_argument(
+        "--evaluator",
+        type=str,
+        choices=[
+            "gpt-4o",
+            "gpt-4o-mini",
+            "claude-3-5-sonnet-20240620",
+            "claude-3-sonnet-20240229"
+        ],
+        help="Specify the evaluator to use for assessing performance, will use the --machine model if not provided."
+    )
+    parser.add_argument(
+        "--human_type",
+        type=str,
+        default="real-time",
+        choices=["real-time", "static"],
+        help="Type of human interaction: real-time for live interaction, static for pre-defined responses"
+    )
+    
+    # Flags for controlling system behavior
+    parser.add_argument(
+        "--eval_at_start",
+        default=False,
+        action="store_true",
+        help="Evaluate the agent at the start of the interaction to get base performance"
+    )
+    parser.add_argument(
+        "--no_learn",
+        default=False,
+        action="store_true",
+        help="Flag to decide to use a validation set which decides whether to learn or not"
+    )
+    parser.add_argument(
+        "--resume",
+        default=False,
+        action="store_true",
+        help="Resume the interaction from a saved state"
+    )
+    
+    # Resume-related parameters
+    resume_group = parser.add_argument_group('Resume Parameters', 'Parameters used when resuming from a saved state')
+    resume_group.add_argument(
+        "--start_idx",
+        type=int,
+        default=0,
+        help="Start index for the interaction when resuming"
+    )
+    resume_group.add_argument(
+        "--D",
+        type=str,
+        default=None,
+        help="Path to the relational database file"
+    )
+    resume_group.add_argument(
+        "--M",
+        type=str,
+        default=None,
+        help="Path to the messages file"
+    )
+    resume_group.add_argument(
+        "--C",
+        type=str,
+        default=None,
+        help="Path to the context file"
+    )
+    
+    args = parser.parse_args()
+
+    # assign evaluator to machine if not provided
+    if args.evaluator is None:
+        args.evaluator = args.machine
+    
+    # Validate resume-related arguments
+    if args.resume:
+        if not all([args.D, args.M, args.C]):
+            parser.error("When --resume is set, --D, --M, and --C must all be provided")
+    
+    return args

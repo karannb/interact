@@ -1,3 +1,4 @@
+import litellm
 from copy import deepcopy
 from functools import partial
 from abc import abstractmethod
@@ -5,16 +6,7 @@ from abc import abstractmethod
 from tasks import RAD, DRUG
 from utils import bcolors, draw_smiles
 
-import os
-from openai import OpenAI
-openai_org = os.getenv("OPENAI_ORG")
-openai_key = os.getenv("OPENAI_KEY")
-client = OpenAI(
-    organization=openai_org,
-    api_key=openai_key,
-)
-
-from typing import Tuple, List, Dict, Callable
+from typing import Tuple, List, Dict, Callable, Optional
 
 
 class Agent:
@@ -30,6 +22,7 @@ class Agent:
         self.expls = -1.0
 
         # these are set in the subclasses
+        self.llm: str = None
         self.match: Callable = None
         self.agree: Callable = None
 
@@ -69,15 +62,15 @@ class Agent:
                 # we decide to put the ground truth first
                 # and then the prediction / generation
                 matchOK = self.match(ypp, yp)
-                agreeOK = self.agree(epp, ep)
+                agreeOK = self.agree(epp, ep, self.llm)
             else: # machine
                 matchOK = self.match(yp, ypp)
-                agreeOK = self.agree(ep, epp)
+                agreeOK = self.agree(ep, epp, self.llm)
             catA = matchOK and agreeOK
             catB = matchOK and not agreeOK
             catC = not matchOK and agreeOK
             catD = not matchOK and not agreeOK
-            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat))
+            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat, self.llm))
 
             # because change is an approximate test, we make sure that the there are no 
             # ambiguities by manually resetting y_hat and e_hat to 2 turns ago
@@ -224,10 +217,10 @@ class RADMachine(RADAgent):
     """
     Machine agent class.
     """
-    def __init__(self, id: int):
+    def __init__(self, id: int, LLM: str = "gpt-4o-mini"):
         super().__init__("Machine", id)
-        self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o-mini",
+        self.llm = partial(litellm.completion, 
+                           model=LLM,
                            max_tokens=300,
                            seed=42)
 
@@ -388,10 +381,10 @@ class DRUGMachine(DRUGAgent):
     """
     Machine agent class.
     """
-    def __init__(self, id: int):
+    def __init__(self, id: int, LLM: str = "gpt-4o"):
         super().__init__("Machine", id)
-        self.llm = partial(client.chat.completions.create, 
-                           model="gpt-4o",
+        self.llm = partial(litellm.completion, 
+                           model=LLM,
                            max_tokens=1024,
                            seed=42)
 
@@ -558,7 +551,7 @@ class DRUGHumanStatic(DRUGAgent):
 """
 Factory method to create agents.
 """
-def create_agent(task: str, type: str, human_type: str, id: int):
+def create_agent(task: str, type: str, human_type: str, id: int, LLM: Optional[str] = None) -> Agent:
     """
     Factory method to create agents.
 
@@ -566,20 +559,22 @@ def create_agent(task: str, type: str, human_type: str, id: int):
         task (str): task type
         type (str): agent type
         id (int): agent id
+        LLM (str): LLM model to use
 
     Returns:
         Agent: agent object
     """
     if task == "RAD":
         if type == "Machine":
-            return RADMachine(id)
+            return RADMachine(id, LLM)
         elif type == "Human":
+            assert human_type == "static", f"Human type must be static for the RAD task, got {human_type}."
             return RADHuman(id)
         else:
             raise ValueError(f"Invalid agent type: {type}")
     elif task == "DRUG":
         if type == "Machine":
-            return DRUGMachine(id)
+            return DRUGMachine(id, LLM)
         elif type == "Human":
             if human_type == "real-time":
                 return DRUGHuman(id)

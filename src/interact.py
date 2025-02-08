@@ -5,17 +5,18 @@ import os
 import uuid
 import pickle
 import pandas as pd
-from typing import List
 from copy import deepcopy
+
 from tasks import RAD, DRUG
+from utils import parse_args
 from agent import create_agent
-from argparse import ArgumentParser
 
 from typing import Optional, Dict, List, Union
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
 def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 
+             machine_llm: str, evaluator_llm: str,
              resume: bool, D: Optional[List], M: Optional[List], C: Optional[Prompt],
 			 human_type: str, eval_at_start: bool, no_learn: bool, task: str, 
 			 h: int, m: int, n: int, k: int = 3) -> List:
@@ -26,6 +27,8 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		train_data: Training data for the agent
 		val_data (pd.DataFrame): Validation data for the agent and task, used in learn
 		test_data (Optional, pd.DataFrame): Test data for the agent and task, used in evaluate
+		machine (str): The LLM to use as the machine agent
+		evaluator (str): The evaluator to use for assessing performance, will use the --machine model if not provided
 		resume (bool): Resume the interaction from a saved state
 		D (Optional, List): List of relational databases
 		M (Optional, List): List of messages
@@ -52,7 +55,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 	# Initialize the agents
 	assert task in ["RAD", "DRUG"], f"Invalid task, expected 'RAD' or 'DRUG', got {task}."
 	human = create_agent(task, "Human", human_type, h)
-	machine = create_agent(task, "Machine",human_type, m)
+	machine = create_agent(task, "Machine",human_type, m, machine_llm)
 
 	# Select the task-specific functions
 	learn_fn = RAD.learn if task == "RAD" else DRUG.learn
@@ -65,7 +68,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		elif task == "RAD":
 			print("We only support performance evaluation for DRUG, but got task RAD. Continuing without evaluation...")
 		elif task == "DRUG":
-			evaluate_fn([], test_data, machine, set="TEST_START")
+			evaluate_fn([], test_data, machine, set="TEST_START", evaluator_llm=evaluator_llm)
 			print("Evaluation at start complete.")
 
 	# metrics
@@ -124,7 +127,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		if no_learn:
 			learnOK = True
 		else:
-			learnOK = learn_fn(C_, val_data, machine)
+			learnOK = learn_fn(C_, val_data, machine, evaluator_llm)
 
 		# update the context
 		if learnOK:
@@ -184,21 +187,9 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 	return D, M, C
 
 
-if __name__ == "__main__":
+def main():
 
-	parser = ArgumentParser()
-	parser.add_argument("--n", "--num_iter", type=int, default=3)
-	parser.add_argument("--task", type=str, default="RAD", choices=["RAD", "DRUG"])
-	parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time", "static"])
-	parser.add_argument("--eval_at_start", default=False, action="store_true", help="Evaluate the agent at the start of the interaction to get base performance.")
-	parser.add_argument("--no_learn", default=False, action="store_true", help="Flag to decide to use learn or not.")
-	parser.add_argument("--resume", default=False, action="store_true", help="Resume the interaction from a saved state.")
-	# the next arguments will only be effective if the resume flag is set to True
-	parser.add_argument("--start_idx", type=int, default=0, help="Start index for the interaction.")
-	parser.add_argument("--D", type=str, default=None, help="Path to the relational database.")
-	parser.add_argument("--M", type=str, default=None, help="Path to the messages.")
-	parser.add_argument("--C", type=str, default=None, help="Path to the context.")
-	args = parser.parse_args()
+	args = parse_args()
 
 	if args.task == "RAD":
 		train_data = pd.read_csv("data/train_xray_data.csv", index_col=None)
@@ -252,3 +243,7 @@ if __name__ == "__main__":
 		pickle.dump(M, f)
 	with open("results/context_final.pkl", "wb") as f:
 		pickle.dump(C, f)
+
+
+if __name__ == "__main__":
+    main()
