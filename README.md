@@ -15,6 +15,7 @@ You will also have to create a results folder,
 ```bash
 mkdir results
 ```
+Finally, you can place your API keys in a `.env` file in the root directory, a template is in `.env.template`.
 
 ### Data
 For the RAD task, please write to Prof. Sidong Liu [[email](mailto:sidong.liu@mq.edu.au)].
