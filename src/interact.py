@@ -6,13 +6,18 @@ import uuid
 import pickle
 import pandas as pd
 from copy import deepcopy
+from dotenv import load_dotenv
 
 from tasks import RAD, DRUG
 from utils import parse_args
 from agent import create_agent
 
 from typing import Optional, Dict, List, Union
+
+
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
+# set API keys
+load_dotenv()
 
 
 def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 

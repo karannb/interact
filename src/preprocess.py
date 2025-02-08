@@ -4,6 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils import summarize
 
+
 def preprocess(counts=4):
     """
     This is a simple function to retain data used for the project.

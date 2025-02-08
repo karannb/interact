@@ -1,11 +1,16 @@
 import base64
 import litellm
 import argparse
+from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 
 from rdkit import Chem
 from rdkit.Chem import Draw
 from rdkit.Chem import rdChemReactions as Reactions
+
+
+# set API keys
+load_dotenv()
 
 
 class bcolors:

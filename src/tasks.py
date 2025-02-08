@@ -4,14 +4,17 @@ import pandas as pd
 from copy import deepcopy
 from abc import abstractmethod
 from utils import encode_image
+from dotenv import load_dotenv
 
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
-
 from typing import Tuple, List, Union, Dict, Optional
-Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
+
+Prompt = Union[Dict[str, str], List[Dict[str, str]]]
+# set API keys
+load_dotenv()
 
 class Task:
 	"""

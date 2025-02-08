@@ -1,6 +1,7 @@
 import litellm
 from copy import deepcopy
 from functools import partial
+from dotenv import load_dotenv
 from abc import abstractmethod
 
 from tasks import RAD, DRUG
@@ -8,6 +9,9 @@ from utils import bcolors, draw_smiles
 
 from typing import Tuple, List, Dict, Callable, Optional
 
+
+# set API keys
+load_dotenv()
 
 class Agent:
     """
