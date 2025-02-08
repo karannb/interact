@@ -11,10 +11,12 @@ from tasks import RAD, DRUG
 from agent import create_agent
 from argparse import ArgumentParser
 
-from typing import Optional
+from typing import Optional, Dict, List, Union
+Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
 
 def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFrame], 
+             resume: bool, D: Optional[List], M: Optional[List], C: Optional[Prompt],
 			 human_type: str, eval_at_start: bool, no_learn: bool, task: str, 
 			 h: int, m: int, n: int, k: int = 3) -> List:
 	"""
@@ -24,6 +26,10 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		train_data: Training data for the agent
 		val_data (pd.DataFrame): Validation data for the agent and task, used in learn
 		test_data (Optional, pd.DataFrame): Test data for the agent and task, used in evaluate
+		resume (bool): Resume the interaction from a saved state
+		D (Optional, List): List of relational databases
+		M (Optional, List): List of messages
+		C (Optional, Prompt): Context for the interaction
 		human_type (str): Type of human agent, either "real-time" or "static", Only used in DRUG task
 		eval_at_start (bool): Evaluate the agent at the start of the interaction to get base performance
 		no_learn (bool): If True, the agent will always add a session to the context
@@ -38,7 +44,8 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 	"""
 
 	# Initialize the relational databases
-	D, M, C = [], [], None
+	if not resume:
+		D, M, C = [], [], None
 	n *= 2 # number of interactions need to be doubled 
 	n += 1 # and 1 is added because the first interaction is "initialization"
 
@@ -119,6 +126,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 		else:
 			learnOK = learn_fn(C_, val_data, machine)
 
+		# update the context
 		if learnOK:
 			C = C_
 		else:
@@ -139,6 +147,14 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 			one_way_machine += 1
 		if (l_h == "ratify") and (l_m == "ratify" or l_m_revision):
 			two_way += 1
+
+		# save the state of the interaction
+		with open("results/data.pkl", "wb") as f:
+			pickle.dump(D, f)
+		with open("results/messages.pkl", "wb") as f:
+			pickle.dump(M, f)
+		with open("results/context.pkl", "wb") as f:
+			pickle.dump(C, f)
 
 	print(f"Total Sessions: {total_sessions}")
 	print(f"One-way Human: {one_way_human}")
@@ -161,7 +177,7 @@ def Interact(train_data, val_data: pd.DataFrame, test_data: Optional[pd.DataFram
 	Two-way: {two_way}
 	"""
 
-	f = open("results/accuracy_log.txt","a+")
+	f = open("results/accuracy_log.txt", "a+")
 	f.write(log_str)
 	f.close()
 
@@ -176,6 +192,12 @@ if __name__ == "__main__":
 	parser.add_argument("--human_type", type=str, default="real-time", choices=["real-time", "static"])
 	parser.add_argument("--eval_at_start", default=False, action="store_true", help="Evaluate the agent at the start of the interaction to get base performance.")
 	parser.add_argument("--no_learn", default=False, action="store_true", help="Flag to decide to use learn or not.")
+	parser.add_argument("--resume", default=False, action="store_true", help="Resume the interaction from a saved state.")
+	# the next arguments will only be effective if the resume flag is set to True
+	parser.add_argument("--start_idx", type=int, default=0, help="Start index for the interaction.")
+	parser.add_argument("--D", type=str, default=None, help="Path to the relational database.")
+	parser.add_argument("--M", type=str, default=None, help="Path to the messages.")
+	parser.add_argument("--C", type=str, default=None, help="Path to the context.")
 	args = parser.parse_args()
 
 	if args.task == "RAD":
@@ -205,17 +227,28 @@ if __name__ == "__main__":
 	open("results/accuracy_log.txt", "w").close()
 
 	# Interact with the agents
+	if args.resume and args.start_idx > 0:
+		train_data = train_data.iloc[args.start_idx:]
+		with open(args.D, "rb") as f:
+			D = pickle.load(f)
+		with open(args.M, "rb") as f:
+			M = pickle.load(f)
+		with open(args.C, "rb") as f:
+			C = pickle.load(f)
+	else:
+		D, M, C = [], [], None
+
 	iterdata = train_data.iterrows()
-	D, M, C = Interact(iterdata, val_data, test_data, human_type=args.human_type, 
-					   eval_at_start=args.eval_at_start, task=args.task, h=1, m=2, 
-					   n=args.n, no_learn=args.no_learn)
+	D, M, C = Interact(iterdata, val_data, test_data, D, M, C, args.resume,
+					   human_type=args.human_type, eval_at_start=args.eval_at_start, task=args.task, 
+					   h=1, m=2, n=args.n, no_learn=args.no_learn)
 
 	# save the relational databases
 	if not os.path.exists("results"):
 		os.makedirs("results")
-	with open("results/data.pkl", "wb") as f:
+	with open("results/data_final.pkl", "wb") as f:
 		pickle.dump(D, f)
-	with open("results/messages.pkl", "wb") as f:
+	with open("results/messages_final.pkl", "wb") as f:
 		pickle.dump(M, f)
-	with open("results/context.pkl", "wb") as f:
+	with open("results/context_final.pkl", "wb") as f:
 		pickle.dump(C, f)
