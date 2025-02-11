@@ -12,6 +12,7 @@ from typing import Tuple, List, Dict, Callable, Optional
 
 # set API keys
 load_dotenv()
+litellm.drop_params = True
 
 class Agent:
     """
