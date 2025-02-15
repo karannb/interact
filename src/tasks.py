@@ -317,8 +317,8 @@ class RAD(Task):
 		"""
 		set_name = kwargs.pop("set", None)
 		print(f"Evaluating on {set_name} set...")
-		evaluator_llm = kwargs.pop("evaluator_llm", None)
-		assert evaluator_llm is not None, "Evaluator LLM not provided."
+		evaluator = kwargs.pop("evaluator", None)
+		assert evaluator is not None, "Evaluator LLM not provided."
 
 		# initialize the counters
 		total = 0
@@ -348,7 +348,7 @@ class RAD(Task):
 
 			# check if the prediction is correct
 			matchOK = RAD.match(y, y_pred)
-			agreeOK = RAD.agree(e, e_pred, evaluator_llm)
+			agreeOK = RAD.agree(e, e_pred, evaluator)
 			correct_preds += 1 if matchOK else 0
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0
@@ -672,8 +672,8 @@ class DRUG(Task):
 		"""
 		set_name = kwargs.pop("set", None)
 		print(f"Evaluating on {set_name} set...")
-		evaluator_llm = kwargs.pop("evaluator_llm", None)
-		assert evaluator_llm is not None, "Evaluator LLM not provided."
+		evaluator = kwargs.pop("evaluator", None)
+		assert evaluator is not None, "Evaluator LLM not provided."
 
 		# initialize the counters
 		total = 0
@@ -703,7 +703,7 @@ class DRUG(Task):
 
 			# check if the prediction is correct
 			matchOK = DRUG.match(y, y_pred)
-			agreeOK = DRUG.agree(e, e_pred, evaluator_llm)
+			agreeOK = DRUG.agree(e, e_pred, evaluator)
 			correct_preds += 1 if matchOK else 0 # this is kept as a check so that other things don't get matched
 			correct_expls += 1 if agreeOK else 0
 			correct += 1 if matchOK and agreeOK else 0

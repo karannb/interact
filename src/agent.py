@@ -1,3 +1,8 @@
+"""
+This module contains code for the Agent class, which is a generic class for agents described in the paper,
+the code decides how they interact with each other.
+"""
+
 import litellm
 from copy import deepcopy
 from functools import partial
@@ -12,6 +17,8 @@ from typing import Tuple, List, Dict, Callable, Optional
 
 # set API keys
 load_dotenv()
+# drops unsupported params from the API call
+# https://docs.litellm.ai/docs/completion/drop_params
 litellm.drop_params = True
 
 class Agent:
@@ -27,7 +34,8 @@ class Agent:
         self.expls = -1.0
 
         # these are set in the subclasses
-        self.llm: str = None
+        self.llm: str = None # only used for machine agents
+        self.evaluator: str = None # required for both agents
         self.match: Callable = None
         self.agree: Callable = None
 
@@ -67,15 +75,15 @@ class Agent:
                 # we decide to put the ground truth first
                 # and then the prediction / generation
                 matchOK = self.match(ypp, yp)
-                agreeOK = self.agree(epp, ep, self.llm)
+                agreeOK = self.agree(epp, ep, self.evaluator)
             else: # machine
                 matchOK = self.match(yp, ypp)
-                agreeOK = self.agree(ep, epp, self.llm)
+                agreeOK = self.agree(ep, epp, self.evaluator)
             catA = matchOK and agreeOK
             catB = matchOK and not agreeOK
             catC = not matchOK and agreeOK
             catD = not matchOK and not agreeOK
-            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat, self.llm))
+            change = (not self.match(ypp, y_hat)) or (not self.agree(epp, e_hat, self.evaluator))
 
             # because change is an approximate test, we make sure that the there are no 
             # ambiguities by manually resetting y_hat and e_hat to 2 turns ago
@@ -222,12 +230,13 @@ class RADMachine(RADAgent):
     """
     Machine agent class.
     """
-    def __init__(self, id: int, LLM: str = "gpt-4o-mini"):
+    def __init__(self, id: int, evaluator: str, LLM: str = "gpt-4o-mini"):
         super().__init__("Machine", id)
         self.llm = partial(litellm.completion, 
                            model=LLM,
                            max_tokens=300,
                            seed=42)
+        self.evaluator = evaluator
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -271,8 +280,9 @@ class RADHuman(RADAgent):
     """
     Human agent class.
     """
-    def __init__(self, id: int):
+    def __init__(self, id: int, evaluator: str):
         super().__init__("Human", id)
+        self.evaluator = evaluator
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -386,12 +396,13 @@ class DRUGMachine(DRUGAgent):
     """
     Machine agent class.
     """
-    def __init__(self, id: int, LLM: str = "gpt-4o"):
+    def __init__(self, id: int, evaluator: str, LLM: str = "gpt-4o"):
         super().__init__("Machine", id)
         self.llm = partial(litellm.completion, 
                            model=LLM,
                            max_tokens=1024,
                            seed=42)
+        self.evaluator = evaluator
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -436,8 +447,9 @@ class DRUGHuman(DRUGAgent):
     """
     Human agent that interacts using a CLI (Command Line Interface).
     """
-    def __init__(self, id: int):
+    def __init__(self, id: int, evaluator: str):
         super().__init__("Human", id)
+        self.evaluator = evaluator
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -522,8 +534,9 @@ class DRUGHumanStatic(DRUGAgent):
     """
     Human agent class.
     """
-    def __init__(self, id: int):
+    def __init__(self, id: int, evaluator: str):
         super().__init__("Human", id)
+        self.evaluator = evaluator
 
     def ask(self, x: Tuple, C: List[Dict], is_prompt: bool = False) -> Tuple:
         """
@@ -556,7 +569,8 @@ class DRUGHumanStatic(DRUGAgent):
 """
 Factory method to create agents.
 """
-def create_agent(task: str, type: str, human_type: str, id: int, LLM: Optional[str] = None) -> Agent:
+def create_agent(task: str, type: str, human_type: str, id: int, evaluator: str, 
+                 LLM: Optional[str] = None) -> Agent:
     """
     Factory method to create agents.
 
@@ -564,6 +578,7 @@ def create_agent(task: str, type: str, human_type: str, id: int, LLM: Optional[s
         task (str): task type
         type (str): agent type
         id (int): agent id
+        evaluator (str): evaluator type
         LLM (str): LLM model to use
 
     Returns:
@@ -571,20 +586,20 @@ def create_agent(task: str, type: str, human_type: str, id: int, LLM: Optional[s
     """
     if task == "RAD":
         if type == "Machine":
-            return RADMachine(id, LLM)
+            return RADMachine(id, evaluator, LLM)
         elif type == "Human":
             assert human_type == "static", f"Human type must be static for the RAD task, got {human_type}."
-            return RADHuman(id)
+            return RADHuman(id, evaluator)
         else:
             raise ValueError(f"Invalid agent type: {type}")
     elif task == "DRUG":
         if type == "Machine":
-            return DRUGMachine(id, LLM)
+            return DRUGMachine(id, evaluator, LLM)
         elif type == "Human":
             if human_type == "real-time":
-                return DRUGHuman(id)
+                return DRUGHuman(id, evaluator)
             elif human_type == "static":
-                return DRUGHumanStatic(id)
+                return DRUGHumanStatic(id, evaluator)
         else:
             raise ValueError(f"Invalid agent type: {type}")
     else:

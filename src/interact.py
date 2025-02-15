@@ -1,5 +1,9 @@
-import sys
+"""
+This is the core module and runs the whole process of interaction between the human and the machine.
+Described in Procedure 1 of the paper.
+"""
 
+import sys
 sys.path.append("./")
 
 import os
@@ -20,11 +24,11 @@ Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 load_dotenv()
 
 
-def Interact(train_data,
-             val_data: pd.DataFrame,
+def Interact(train_data: pd.DataFrame,
+             val_data: Optional[pd.DataFrame],
              test_data: Optional[pd.DataFrame],
              machine_llm: str,
-             evaluator_llm: str,
+             evaluator: str,
              resume: bool,
              D: Optional[List],
              M: Optional[List],
@@ -41,7 +45,7 @@ def Interact(train_data,
 	Core function that simulates an interaction between the human and the machine.
 
 	Args:
-		train_data: Training data for the agent
+		train_data (pd.DataFrame): Training data for the agent
 		val_data (pd.DataFrame): Validation data for the agent and task, used in learn
 		test_data (Optional, pd.DataFrame): Test data for the agent and task, used in evaluate
 		machine (str): The LLM to use as the machine agent
@@ -72,8 +76,8 @@ def Interact(train_data,
     # Initialize the agents
     assert task in ["RAD", "DRUG"
                     ], f"Invalid task, expected 'RAD' or 'DRUG', got {task}."
-    human = create_agent(task, "Human", human_type, h)
-    machine = create_agent(task, "Machine", human_type, m, machine_llm)
+    human = create_agent(task, "Human", human_type, evaluator, h)
+    machine = create_agent(task, "Machine", None, m, evaluator, machine_llm)
 
     # Select the task-specific functions
     learn_fn = RAD.learn if task == "RAD" else DRUG.learn
@@ -94,7 +98,7 @@ def Interact(train_data,
                         test_data,
                         machine,
                         set="TEST_START",
-                        evaluator_llm=evaluator_llm)
+                        evaluator=evaluator)
             print("Evaluation at start complete.")
 
     # metrics
@@ -104,7 +108,7 @@ def Interact(train_data,
     l_m_revision = False
 
     # Iterate over all input data
-    for _, x in train_data:
+    for _, x in train_data.iterrows():
 
         # Generate a random session identifier and store the input data
         sess = uuid.uuid4().hex[:4]
@@ -155,9 +159,16 @@ def Interact(train_data,
 
         # decide if the context is helpful
         if no_learn:
+            print("no_learn is set to True, always adding the session to the context.")
             learnOK = True
         else:
-            learnOK = learn_fn(C_, val_data, machine, evaluator_llm)
+            if val_data is None:
+                print(
+                    "val_data is None, but no_learn was not set to True, continuing without learning..."
+                )
+                learnOK = False
+            else:
+                learnOK = learn_fn(C_, val_data, machine, evaluator)
 
         # update the context
         if learnOK:
@@ -214,9 +225,8 @@ def Interact(train_data,
 	Two-way: {two_way}
 	"""
 
-    f = open("results/accuracy_log.txt", "a+")
-    f.write(log_str)
-    f.close()
+    with open("results/accuracy_log.txt", "a+") as f:
+        f.write(log_str)
 
     return D, M, C
 
@@ -235,7 +245,7 @@ def main():
         test_data = None
         print("*" * 50)
         print(
-            "We do not have test data for the RAD task, and as such only report the intelligibility metrics."
+            "We have not curated test data for the RAD task, and as such only report the intelligibility metrics."
         )
         print("*" * 50)
     elif args.task == "DRUG":
@@ -256,9 +266,10 @@ def main():
                          args.task)
 
     # create a new accuracy log file for each run
-    open("results/accuracy_log.txt", "w").close()
+    with open("results/accuracy_log.txt", "w") as f:
+        f.write("")
 
-    # Interact with the agents
+    # resume from a saved state
     if args.resume and args.start_idx > 0:
         train_data = train_data.iloc[args.start_idx:]
         with open(args.D, "rb") as f:
@@ -270,12 +281,12 @@ def main():
     else:
         D, M, C = [], [], None
 
-    iterdata = train_data.iterrows()
-    D, M, C = Interact(train_data=iterdata,
+    # Interact with the agents
+    D, M, C = Interact(train_data=train_data,
                        val_data=val_data,
                        test_data=test_data,
                        machine_llm=args.machine,
-                       evaluator_llm=args.machine,
+                       evaluator=args.evaluator,
                        D=D,
                        M=M,
                        C=C,

@@ -9,10 +9,6 @@ from rdkit.Chem import Draw
 from rdkit.Chem import rdChemReactions as Reactions
 
 
-# set API keys
-load_dotenv()
-
-
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -25,6 +21,8 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
+# set API keys
+load_dotenv()
 from typing import List, Union, Dict
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 
@@ -118,7 +116,7 @@ def parse_args():
         argparse.Namespace: Parsed command-line arguments
     """
     parser = argparse.ArgumentParser(description="Configuration for interactive learning system")
-    
+
     # Core parameters
     parser.add_argument(
         "--n", "--num_iter",
@@ -164,7 +162,7 @@ def parse_args():
         choices=["real-time", "static"],
         help="Type of human interaction: real-time for live interaction, static for pre-defined responses"
     )
-    
+
     # Flags for controlling system behavior
     parser.add_argument(
         "--eval_at_start",
@@ -179,12 +177,18 @@ def parse_args():
         help="Flag to decide to use a validation set which decides whether to learn or not"
     )
     parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true",
+        help="Debug mode for the interaction system, clips the train, val and test sets to 5 examples, 2 examples and 2 examples respectively."
+    )
+    parser.add_argument(
         "--resume",
         default=False,
         action="store_true",
         help="Resume the interaction from a saved state"
     )
-    
+
     # Resume-related parameters
     resume_group = parser.add_argument_group('Resume Parameters', 'Parameters used when resuming from a saved state')
     resume_group.add_argument(
