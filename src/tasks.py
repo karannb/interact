@@ -15,6 +15,12 @@ from typing import Tuple, List, Union, Dict, Optional
 Prompt = Union[Dict[str, str], List[Dict[str, str]]]
 # set API keys
 load_dotenv()
+# drops unsupported params from the API call
+# https://docs.litellm.ai/docs/completion/drop_params
+litellm.drop_params = True
+# this allows system prompts to be passed in GPT-4o
+# style to any LLM
+litellm.modify_params = True
 
 class Task:
 	"""
@@ -127,6 +133,7 @@ class RAD(Task):
 		"""
 		_, img, _ = x
 		encoded_img = encode_image(img)
+		extension = img.split(".")[-1]
 		messages = [
 			{
 				"role": "system",
@@ -162,7 +169,7 @@ class RAD(Task):
 					{
 						"type": "image_url",
 						"image_url": {
-							"url": f"data:image/jpeg;base64,{encoded_img}"
+							"url": f"data:image/{extension};base64,{encoded_img}"
 							}
 						}
 					]

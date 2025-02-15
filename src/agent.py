@@ -4,6 +4,7 @@ the code decides how they interact with each other.
 """
 
 import litellm
+from rdkit import Chem
 from copy import deepcopy
 from functools import partial
 from dotenv import load_dotenv
@@ -20,6 +21,9 @@ load_dotenv()
 # drops unsupported params from the API call
 # https://docs.litellm.ai/docs/completion/drop_params
 litellm.drop_params = True
+# this allows system prompts to be passed in GPT-4o
+# style to any LLM
+litellm.modify_params = True
 
 class Agent:
     """
@@ -508,6 +512,13 @@ class DRUGHuman(DRUGAgent):
             safety = input("Are you sure about this prediction? ([y]/n): ")
             if safety == "y" or safety == "" or safety.lower() == "y":
                 done_with_prediction = True
+
+            # check if the prediction is a valid SMILES string
+            try:
+                mol = Chem.MolFromSmiles(y_h)
+            except:
+                print("Invalid SMILES string. Please try again.")
+                done_with_prediction = False
 
         # ask for explanation
         done_with_explanation = False

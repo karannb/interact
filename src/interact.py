@@ -76,7 +76,7 @@ def Interact(train_data: pd.DataFrame,
     # Initialize the agents
     assert task in ["RAD", "DRUG"
                     ], f"Invalid task, expected 'RAD' or 'DRUG', got {task}."
-    human = create_agent(task, "Human", human_type, evaluator, h)
+    human = create_agent(task, "Human", human_type, h, evaluator)
     machine = create_agent(task, "Machine", None, m, evaluator, machine_llm)
 
     # Select the task-specific functions
@@ -168,7 +168,7 @@ def Interact(train_data: pd.DataFrame,
                 )
                 learnOK = False
             else:
-                learnOK = learn_fn(C_, val_data, machine, evaluator)
+                learnOK = learn_fn(C_, val_data, machine, evaluator=evaluator)
 
         # update the context
         if learnOK:
@@ -176,9 +176,10 @@ def Interact(train_data: pd.DataFrame,
         else:
             print("Session not helpful, not adding to the context.")
 
+        # check test-set performance
         if (test_data is not None) and (l_m_revision) and learnOK:
             if task == "DRUG":
-                evaluate_fn(C, test_data, machine, set="TEST")
+                evaluate_fn(C, test_data, machine, set="TEST", evaluator=evaluator)
             else:
                 print(
                     f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation..."
@@ -265,6 +266,13 @@ def main():
         raise ValueError("Invalid task, expected 'RAD' or 'DRUG', got " +
                          args.task)
 
+    # if debugging, reduce data
+    if args.debug:
+        print("Debug mode enabled, reducing data to 5 train, 2 val and 2 test examples.")
+        train_data = train_data.head(5)
+        val_data = val_data.head(2)
+        test_data = test_data.head(2) if test_data is not None else None
+
     # create a new accuracy log file for each run
     with open("results/accuracy_log.txt", "w") as f:
         f.write("")
@@ -281,7 +289,7 @@ def main():
     else:
         D, M, C = [], [], None
 
-    # Interact with the agents
+    # Run the protocol
     D, M, C = Interact(train_data=train_data,
                        val_data=val_data,
                        test_data=test_data,

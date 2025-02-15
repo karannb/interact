@@ -27,7 +27,7 @@ This will also summarize the data, using the `summarize` function from `src/util
 ### Reproducing our results (simulation)
 To reproduce our RAD results, you can run the following command:
 ```bash
-python src/interact.py --num_iter=5 --machine="claude-3-5-sonnet-20240620"
+python src/interact.py --num_iter=5 --machine="claude-3-5-sonnet-20240620" --human_type static
 ```
 
 To reproduce our DRUG results, you can run the following command:

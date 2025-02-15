@@ -122,14 +122,14 @@ def parse_args():
         "--n", "--num_iter",
         type=int,
         default=3,
-        help="Number of iterations for the interaction loop"
+        help="Number of iterations for the interaction loop. Default: 3"
     )
     parser.add_argument(
         "--task",
         type=str,
         default="RAD",
         choices=["RAD", "DRUG"],
-        help="Task type to perform: RAD (Radiology) or DRUG (Retrosynthesis)."
+        help="Task type to perform: RAD (Radiology) or DRUG (Retrosynthesis). Default: RAD"
     )
     parser.add_argument(
         "--machine",
@@ -142,7 +142,7 @@ def parse_args():
             "claude-3-5-sonnet-20240620",
             "claude-3-sonnet-20240229"
         ],
-        help="Language model to use for the interaction"
+        help="Language model to use for the interaction. Default: gpt-4o"
     )
     parser.add_argument(
         "--evaluator",
@@ -160,7 +160,7 @@ def parse_args():
         type=str,
         default="real-time",
         choices=["real-time", "static"],
-        help="Type of human interaction: real-time for live interaction, static for pre-defined responses"
+        help="Type of human interaction: real-time for live interaction, static for pre-defined responses. Default: real-time"
     )
 
     # Flags for controlling system behavior
@@ -194,7 +194,7 @@ def parse_args():
     resume_group.add_argument(
         "--start_idx",
         type=int,
-        default=0,
+        default=None,
         help="Start index for the interaction when resuming"
     )
     resume_group.add_argument(
@@ -224,7 +224,7 @@ def parse_args():
     
     # Validate resume-related arguments
     if args.resume:
-        if not all([args.D, args.M, args.C]):
-            parser.error("When --resume is set, --D, --M, and --C must all be provided")
+        if not all([args.D, args.M, args.C, args.start_idx]):
+            parser.error("When --resume is set, --D, --M, --C and --start_idx must all be provided")
     
     return args
