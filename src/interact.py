@@ -274,9 +274,8 @@ def main():
         print("*" * 50)
     elif args.task == "DRUG":
         data = pd.read_csv(
-            "data/retro_match_sorted.csv",
+            "data/retro.csv",
             index_col=None)  # by default in y, x, e format, i.e. y ->^e x
-        data.drop(columns=["matchOK"], inplace=True)
         # shuffle the data
         data = data.sample(frac=1, random_state=42).reset_index(drop=True)
         data = data[["output", "input", "explanation"]]

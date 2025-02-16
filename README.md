@@ -18,9 +18,11 @@ mkdir results
 Finally, you can place your API keys in a `.env` file in the root directory, a template is in `.env.template`.
 
 ### Data
-For the RAD task, please write to Prof. Sidong Liu [[email](mailto:sidong.liu@mq.edu.au)].
-For the DRUG task, please write to Shreyas V [[email](mailto:shreyas.college@gmail.com)].
-Please mention "[INTERACT]" in the subject.
+Our data is provided as a zip file, `data.zip`, run
+```bash
+unzip data.zip
+```
+to extract the data.
 You can then use `src/preprocess.py` to generate the data in the correct format, for the experiments.
 This will also summarize the data, using the `summarize` function from `src/utils.py`.
 
