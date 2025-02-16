@@ -215,6 +215,12 @@ def parse_args():
         default=None,
         help="Path to the context file"
     )
+    parser.add_argument(
+        "--metrics",
+        type=str,
+        default=None,
+        help="Path to the metrics file"
+    )
     
     args = parser.parse_args()
 
@@ -224,7 +230,7 @@ def parse_args():
     
     # Validate resume-related arguments
     if args.resume:
-        if not all([args.D, args.M, args.C, args.start_idx]):
-            parser.error("When --resume is set, --D, --M, --C and --start_idx must all be provided")
+        if not all([args.D, args.M, args.C, args.start_idx, args.metrics]):
+            parser.error("When --resume is set, --D, --M, --C, --metrics and --start_idx must all be provided")
     
     return args

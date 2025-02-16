@@ -49,6 +49,9 @@ python src/interact.py --num_iter=5 --machine="claude-3-sonnet-20240229" --task=
 Please run `python src/interact.py --help` to see all the parameters that can be customized, we support several LLMs,
 and the implementation should ideally run with all LLMs supported by [litellm](https://docs.litellm.ai/).
 
+#### Resuming a failed experiment
+If the experiment crashes in between (due to API limits, or wrong input, etc.) you can resume the experiment by passing the `--resume` flag. The `-h` flag describes a group of arguments that need to be passed when this flag is set (path to the ongoing context, messages, metrics, etc. files, these are all saved by the code automatically).
+
 #### Static / Real-time feedback
 In general the code allows for interaction between both static and real-time human feedback and an LLM (interfaced by the `XMachine`).
 To use the approach with custom data, 

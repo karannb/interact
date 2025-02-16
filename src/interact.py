@@ -33,6 +33,7 @@ def Interact(train_data: pd.DataFrame,
              D: Optional[List],
              M: Optional[List],
              C: Optional[Prompt],
+             metrics: Optional[Dict],
              human_type: str,
              eval_at_start: bool,
              no_learn: bool,
@@ -54,6 +55,7 @@ def Interact(train_data: pd.DataFrame,
 		D (Optional, List): List of relational databases
 		M (Optional, List): List of messages
 		C (Optional, Prompt): Context for the interaction
+        metrics (Optional, Dict): Metrics for the interaction
 		human_type (str): Type of human agent, either "real-time" or "static", Only used in DRUG task
 		eval_at_start (bool): Evaluate the agent at the start of the interaction to get base performance
 		no_learn (bool): If True, the agent will always add a session to the context
@@ -102,9 +104,15 @@ def Interact(train_data: pd.DataFrame,
             print("Evaluation at start complete.")
 
     # metrics
-    total_sessions = 0
-    one_way_human, one_way_machine = 0, 0
-    two_way = 0
+    if metrics is None:
+        total_sessions = 0
+        one_way_human, one_way_machine = 0, 0
+        two_way = 0
+    else:
+        total_sessions = metrics["total_sessions"]
+        one_way_human = metrics["one_way_human"]
+        one_way_machine = metrics["one_way_machine"]
+        two_way = metrics["two_way"]
     l_m_revision = False
 
     # Iterate over all input data
@@ -202,6 +210,13 @@ def Interact(train_data: pd.DataFrame,
             pickle.dump(M, f)
         with open("results/context.pkl", "wb") as f:
             pickle.dump(C, f)
+        with open("results/metrics.pkl", "wb") as f:
+            pickle.dump({
+                "total_sessions": total_sessions,
+                "one_way_human": one_way_human,
+                "one_way_machine": one_way_machine,
+                "two_way": two_way
+            }, f)
 
     print(f"Total Sessions: {total_sessions}")
     print(f"One-way Human: {one_way_human}")
@@ -211,7 +226,7 @@ def Interact(train_data: pd.DataFrame,
     # final performance on the test data
     if test_data is not None:
         if task == "DRUG":
-            evaluate_fn(C, test_data, machine, set="TEST_END")
+            evaluate_fn(C, test_data, machine, set="TEST_END", evaluator=evaluator)
         else:
             print(
                 f"We only support performance evaluation for DRUG, but got task {task}. Continuing without evaluation..."
@@ -229,7 +244,15 @@ def Interact(train_data: pd.DataFrame,
     with open("results/accuracy_log.txt", "a+") as f:
         f.write(log_str)
 
-    return D, M, C
+    # return the final state of the interaction
+    metrics = {
+        "total_sessions": total_sessions,
+        "one_way_human": one_way_human,
+        "one_way_machine": one_way_machine,
+        "two_way": two_way
+    }
+
+    return D, M, C, metrics
 
 
 def main():
@@ -274,11 +297,15 @@ def main():
         test_data = test_data.head(2) if test_data is not None else None
 
     # create a new accuracy log file for each run
+    if not os.path.exists("results"):
+        os.makedirs("results")
     with open("results/accuracy_log.txt", "w") as f:
         f.write("")
 
     # resume from a saved state
     if args.resume and args.start_idx > 0:
+        if args.start_idx == len(train_data):
+            print("No more interactions left, will directly evaluate the agent.")
         train_data = train_data.iloc[args.start_idx:]
         with open(args.D, "rb") as f:
             D = pickle.load(f)
@@ -286,36 +313,41 @@ def main():
             M = pickle.load(f)
         with open(args.C, "rb") as f:
             C = pickle.load(f)
+        with open(args.metrics, "rb") as f:
+            metrics = pickle.load(f)
+        print(f"Resuming from saved state at index {args.start_idx}.")
+        print(f"len(D): {len(D)}, len(M): {len(M)}, len(C): {len(C)}")
     else:
-        D, M, C = [], [], None
+        D, M, C, metrics = [], [], None, None
 
     # Run the protocol
-    D, M, C = Interact(train_data=train_data,
-                       val_data=val_data,
-                       test_data=test_data,
-                       machine_llm=args.machine,
-                       evaluator=args.evaluator,
-                       D=D,
-                       M=M,
-                       C=C,
-                       resume=args.resume,
-                       human_type=args.human_type,
-                       eval_at_start=args.eval_at_start,
-                       task=args.task,
-                       h=1,
-                       m=2,
-                       n=args.n,
-                       no_learn=args.no_learn)
+    D, M, C, metrics = Interact(train_data=train_data,
+                                val_data=val_data,
+                                test_data=test_data,
+                                machine_llm=args.machine,
+                                evaluator=args.evaluator,
+                                resume=args.resume,
+                                D=D,
+                                M=M,
+                                C=C,
+                                metrics=metrics,
+                                human_type=args.human_type,
+                                eval_at_start=args.eval_at_start,
+                                task=args.task,
+                                h=1,
+                                m=2,
+                                n=args.n,
+                                no_learn=args.no_learn)
 
     # save the relational databases
-    if not os.path.exists("results"):
-        os.makedirs("results")
     with open("results/data_final.pkl", "wb") as f:
         pickle.dump(D, f)
     with open("results/messages_final.pkl", "wb") as f:
         pickle.dump(M, f)
     with open("results/context_final.pkl", "wb") as f:
         pickle.dump(C, f)
+    with open("results/metrics_final.pkl", "wb") as f:
+        pickle.dump(metrics, f)
 
 
 if __name__ == "__main__":
