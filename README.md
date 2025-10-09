@@ -1,5 +1,5 @@
 # interact
-Official Implementation for the intelligibility protocol, PXP. The theory paper was accepted to the [Machine Learning Journal](https://link.springer.com/journal/10994/aims-and-scope) [[DoI](https://link.springer.com/article/10.1007/s10994-025-06750-z)] and the implementation was accepted to the [First Workshop on Multi-Turn Interactions in Large Language Models](https://workshop-multi-turn-interaction.github.io/) at [NeurIPS](https://neurips.cc/Conferences/2025) 2025 [[OpenReview](https://openreview.net/forum?id=9ZCaACjORW)].
+Official Implementation for the intelligibility protocol, PXP. The theory paper was accepted to the [Machine Learning Journal](https://link.springer.com/journal/10994/aims-and-scope) [[DoI](https://link.springer.com/article/10.1007/s10994-025-06750-z)] and the implementation was accepted to the [First Workshop on Multi-Turn Interactions in Large Language Models](https://workshop-multi-turn-interaction.github.io/) at [NeurIPS](https://neurips.cc/Conferences/2025) 2025.
 
 [![arXiv](https://img.shields.io/badge/arXiv-2410.20600-b31b1b.svg)](https://arxiv.org/abs/2410.20600)
 
@@ -111,12 +111,13 @@ For the theory
 
 For this implementation
 ```
-@inproceedings{
-  mestha2025multiturn,
-  title={Multi-Turn Human{\textendash}{LLM} Interaction Through the Lens of a Two-Way Intelligibility Protocol},
-  author={Harshvardhan Mestha and Karan Bania and Shreyas V and Sidong Liu and Ashwin Srinivasan},
-  booktitle={First Workshop on Multi-Turn Interactions in Large Language Models},
-  year={2025},
-  url={https://openreview.net/forum?id=9ZCaACjORW}
+@misc{mestha2025multiturnhumanllminteractionlens,
+      title={Multi-Turn Human-LLM Interaction Through the Lens of a Two-Way Intelligibility Protocol}, 
+      author={Harshvardhan Mestha and Karan Bania and Shreyas V Sathyanarayana and Sidong Liu and Ashwin Srinivasan},
+      year={2025},
+      eprint={2410.20600},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2410.20600}, 
 }
 ```
